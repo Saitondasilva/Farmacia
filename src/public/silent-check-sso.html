@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Silent Check SSO</title>
+    <meta charset="utf-8">
+    <script>
+      window.onload = function() {
+        // Envia a URL completa de volta para a aplicação principal
+        window.parent.postMessage({
+          type: 'keycloak-silent-check',
+          url: window.location.href
+        }, window.location.origin);
+        
+        // Redireciona de volta para a aplicação principal após um curto delay
+        setTimeout(function() {
+          window.location.href = '/dashboard';
+        }, 100);
+      };
+    </script>
+  </head>
+  <body>
+    <div style="display: none;">Silent Check SSO</div>
+  </body>
+</html>

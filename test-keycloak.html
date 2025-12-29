@@ -1,0 +1,45 @@
+<!-- Crie um arquivo test-keycloak.html na raiz do projeto -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Keycloak Connection</title>
+</head>
+<body>
+  <button onclick="testConnection()">Testar Conexão Keycloak</button>
+  <div id="result"></div>
+  
+  <script>
+    async function testConnection() {
+      const resultDiv = document.getElementById('result');
+      
+      try {
+        // Teste 1: Configuração OIDC
+        resultDiv.innerHTML = '<p>Testando conexão com Keycloak...</p>';
+        
+        const configResponse = await fetch(
+          'https://auth-dmr-inss.gov.st/realms/UCID-STP/.well-known/openid-configuration'
+        );
+        
+        if (!configResponse.ok) {
+          throw new Error(`HTTP error! status: ${configResponse.status}`);
+        }
+        
+        const config = await configResponse.json();
+        resultDiv.innerHTML += '<p style="color: green;">✓ Configuração OIDC carregada com sucesso</p>';
+        
+        // Teste 2: Endpoint de autorização
+        resultDiv.innerHTML += `<p>Authorization endpoint: ${config.authorization_endpoint}</p>`;
+        
+        // Teste 3: Verificar se o client existe
+        resultDiv.innerHTML += '<p>Testando client "frontend-ucid"...</p>';
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<p style="color: red;">✗ Erro: ${error.message}</p>`;
+      }
+    }
+    
+    // Executa automaticamente
+    window.onload = testConnection;
+  </script>
+</body>
+</html>
