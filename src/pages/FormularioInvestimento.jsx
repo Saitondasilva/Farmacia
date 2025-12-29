@@ -1,151 +1,357 @@
-import React from 'react';
+import React, {useState} from 'react';
 import { useForm } from 'react-hook-form';
+import { FileText } from 'lucide-react';
+import { Button } from '../components/ui/Button';
 import { format, parseISO, subYears, differenceInYears } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+//import { ptBR } from 'date-fns/locale';
 import { PhoneInput } from '../components/ui/PhoneInput';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const validateAge = (dateString) => {
-  if (!dateString) return true;
-  const birthDate = new Date(dateString);
-  const today = new Date();
-  const age = differenceInYears(today, birthDate);
-  return age >= 18 || 'Deve ter pelo menos 18 anos';
+    if (!dateString) return true;
+    const birthDate = new Date(dateString);
+    const today = new Date();
+    const age = differenceInYears(today, birthDate);
+    return age >= 18 || 'Deve ter pelo menos 18 anos';
 };
 
 const validateInvestment = (value) => {
-  const numValue = parseFloat(value);
-  if (isNaN(numValue)) return 'Valor inválido';
-  return numValue >= 90000 || 'Valor mínimo é 90.000 USD';
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return 'Valor inválido';
+    return numValue >= 90000 || 'Valor mínimo é 90.000 USD';
 };
 
+const MOCK_DOCUMENTOS = [
+    {
+        id: 1,
+        investidor_id: 2,
+        nome_arquivo: 'Passaporte_Maria.pdf',
+        tipo: 'PASSPORT',
+        data_envio: '2025-01-10'
+    },
+    {
+        id: 2,
+        investidor_id: 2,
+        nome_arquivo: 'Extrato_Bancario.pdf',
+        tipo: 'EXTRATO_BANCARIO',
+        data_envio: '2025-01-12'
+    }
+];
+
+
 export default function FormularioInvestimento() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  const editingId = params.get('id');
+    const [editingInvestidor, setEditingInvestidor] = useState(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const editingId = params.get('id');
 
-  const { register, handleSubmit, reset, formState: { errors }, watch } = useForm({
-    defaultValues: {
-      status: 'PENDENTE',
-      preenchimento_automatico: false
-    }
-  });
+    const { register, handleSubmit, reset, formState: { errors }, watch } = useForm({
+        defaultValues: {
+            status: 'PENDENTE',
+            preenchimento_automatico: false
+        }
+    });
 
-  React.useEffect(() => {
-    if (editingId) {
-      const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-      const inv = stored.find(i => String(i.id) === String(editingId));
-      if (inv) {
-        reset({
-          ...inv,
-          data_nascimento: inv.data_nascimento ? format(parseISO(inv.data_nascimento), 'yyyy-MM-dd') : '',
-          passaporte_validade: inv.passaporte_validade ? format(parseISO(inv.passaporte_validade), 'yyyy-MM-dd') : ''
-        });
-      }
-    }
-  }, [editingId, reset]);
+    const statusOptions = [
+        { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+        { value: 'EM VERIFICAÇÃO', label: 'Em Verificação', color: 'bg-blue-100 text-blue-800' },
+        { value: 'APROVADO', label: 'Aprovado', color: 'bg-green-100 text-green-800' },
+        { value: 'REJEITADO', label: 'Rejeitado', color: 'bg-red-100 text-red-800' },
+        { value: 'SUSPENSO', label: 'Suspenso', color: 'bg-gray-100 text-gray-800' }
+    ];
 
-  const onSubmit = (data) => {
-    const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-    if (editingId) {
-      const updated = stored.map(i => (String(i.id) === String(editingId) ? { ...i, ...data } : i));
-      localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(updated));
-    } else {
-      const novo = { ...data, id: Date.now(), valor_investimento: parseFloat(data.valor_investimento || 0) };
-      stored.push(novo);
-      localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(stored));
-    }
+    const tipoInvestimentoOptions = [
+        { value: 'INVESTIMENTO', label: 'Investimento' },
+        { value: 'DOAÇÃO', label: 'Doação' }
+    ];
 
-    navigate('/investidores');
-  };
+    React.useEffect(() => {
+        if (editingId) {
+            const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+            const inv = stored.find(i => String(i.id) === String(editingId));
+            if (inv) {
+                reset({
+                    ...inv,
+                    data_nascimento: inv.data_nascimento ? format(parseISO(inv.data_nascimento), 'yyyy-MM-dd') : '',
+                    passaporte_validade: inv.passaporte_validade ? format(parseISO(inv.passaporte_validade), 'yyyy-MM-dd') : ''
+                });
+            }
+        }
+    }, [editingId, reset]);
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Formulário de Investidor</h1>
-          <p className="text-gray-600">Preencha os dados do investidor</p>
+    const onSubmit = (data) => {
+        const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+        if (editingId) {
+            const updated = stored.map(i => (String(i.id) === String(editingId) ? { ...i, ...data } : i));
+            localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(updated));
+        } else {
+            const novo = { ...data, id: Date.now(), valor_investimento: parseFloat(data.valor_investimento || 0) };
+            stored.push(novo);
+            localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(stored));
+        }
+
+        navigate('/investidores');
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Formulário de Investimento</h1>
+                    <p className="text-gray-600">Preencha os dados do investidor</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>Voltar</Button>
+                </div>
+            </div>
+
+            <div className="card p-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
+                            <input {...register('nome_completo',
+                                { required: 'Nome completo é obrigatório' })}
+                                type="text" className="input mt-1"
+                                placeholder="Nome completo do investidor" />
+                            {errors.nome_completo && (
+                                <p className="mt-1 text-sm text-red-600">{errors.nome_completo.message}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Data de Nascimento *</label>
+                            <input {...register('data_nascimento',
+                                { required: 'Data de nascimento é obrigatória', validate: validateAge })}
+                                type="date" className="input mt-1" max={format(subYears(new Date(), 18), 'yyyy-MM-dd')}
+                            />
+                            {errors.data_nascimento && (
+                                <p className="mt-1 text-sm text-red-600">{errors.data_nascimento.message}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Nacionalidade *</label>
+                            <input {...register('nacionalidade',
+                                { required: 'Nacionalidade é obrigatória' })}
+                                type="text" className="input mt-1"
+                                placeholder="Ex: Portuguesa, Brasileira, etc."
+                            />
+                            {errors.nacionalidade && (
+                                <p className="mt-1 text-sm text-red-600">{errors.nacionalidade.message}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Sexo *</label>
+                            <select {...register('sexo', { required: 'Sexo é obrigatório' })} className="input mt-1">
+                                <option value="">Selecionar sexo</option>
+                                <option value="M">Masculino</option>
+                                <option value="F">Feminino</option>
+                                <option value="O">Outro</option>
+                            </select>
+                            {errors.sexo && (
+                                <p className="mt-1 text-sm text-red-600">{errors.sexo.message}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Estado Civil *</label>
+                            <select {...register('estado_civil', { required: 'Estado civil é obrigatório' })} className="input mt-1">
+                                <option value="">Selecionar estado civil</option>
+                                <option value="SOLTEIRO">Solteiro(a)</option>
+                                <option value="CASADO">Casado(a)</option>
+                                <option value="DIVORCIADO">Divorciado(a)</option>
+                                <option value="VIÚVO">Viúvo(a)</option>
+                                <option value="UNIÃO ESTÁVEL">União Estável</option>
+                            </select>
+                            {errors.estado_civil && (
+                                <p className="mt-1 text-sm text-red-600">{errors.estado_civil.message}</p>
+                            )}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                                Email
+                            </label>
+                            <input
+                                {...register('email', {
+                                    pattern: {
+                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                        message: 'Email inválido'
+                                    }
+                                })}
+                                type="email"
+                                className="input mt-1"
+                                placeholder="exemplo@email.com"
+                            />
+                            {errors.email && (
+                                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Documentos simplificados */}
+                    <div className="border-t pt-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Documentos</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Número do Passaporte *</label>
+                                <input {...register('passaporte_numero', { required: 'Número do passaporte é obrigatório' })} type="text" className="input mt-1" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Validade do Passaporte *</label>
+                                <input {...register('passaporte_validade', { required: 'Validade do passaporte é obrigatória' })} type="date" className="input mt-1" min={format(new Date(), 'yyyy-MM-dd')} />
+                            </div>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700">Número do BI (opcional para estrangeiros)</label>
+                            <input {...register('bi_numero')} type="text" className="input mt-1" />
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700">Anexos *</label>
+                            <input {...register('anexos')} type="file" className="mt-1" multiple />
+                            {watch('anexos') && watch('anexos').length > 0 ? (
+                                <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                                    {Array.from(watch('anexos')).map((f, idx) => (
+                                        <li key={idx} className="flex items-center space-x-2">
+                                            <FileText className="w-4 h-4 text-gray-500" />
+                                            <span>{f.name}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (editingInvestidor && MOCK_DOCUMENTOS.filter(d => d.investidor_id === editingInvestidor.id).length > 0) ? (
+                                <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                                    {MOCK_DOCUMENTOS.filter(d => d.investidor_id === editingInvestidor.id).map(d => (
+                                        <li key={d.id} className="flex items-center space-x-2">
+                                            <FileText className="w-4 h-4 text-gray-500" />
+                                            <span>{d.nome_arquivo}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : null}
+                        </div>
+                    </div>
+
+                    <div className="border-t pt-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Contacto</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Telefone</label>
+                                <PhoneInput {...register('telefone')} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-gray-700">Endereço</label>
+                                <textarea {...register('endereco')} rows="3" className="input mt-1" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Investimento */}
+                    <div className="border-t pt-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-3">Informações de Investimento</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Tipo *
+                                </label>
+                                <select
+                                    {...register('tipo', { required: 'Tipo é obrigatório' })}
+                                    className="input mt-1"
+                                >
+                                    <option value="">Selecionar tipo</option>
+                                    {tipoInvestimentoOptions.map(option => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                {errors.tipo && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.tipo.message}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Valor do Investimento (USD) *
+                                </label>
+                                <input
+                                    {...register('valor_investimento', {
+                                        required: 'Valor do investimento é obrigatório',
+                                        validate: validateInvestment
+                                    })}
+                                    type="number"
+                                    step="0.01"
+                                    min="90000"
+                                    className="input mt-1"
+                                    placeholder="90000.00"
+                                />
+                                {errors.valor_investimento && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.valor_investimento.message}</p>
+                                )}
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Valor mínimo: 90.000 USD
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700">
+                                Status *
+                            </label>
+                            <select
+                                {...register('status', { required: 'Status é obrigatório' })}
+                                className="input mt-1"
+                            >
+                                {statusOptions.map(option => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Observações */}
+                    <div className="border-t pt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                            Observações
+                        </label>
+                        <textarea
+                            {...register('observacoes')}
+                            rows="3"
+                            className="input mt-1"
+                            placeholder="Observações adicionais sobre o investidor..."
+                        />
+                    </div>
+
+                    {/* Preenchimento Automático */}
+                    <div className="border-t pt-4">
+                        <label className="flex items-center">
+                            <input
+                                {...register('preenchimento_automatico')}
+                                type="checkbox"
+                                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                                Preenchimento automático pelo sistema
+                            </span>
+                        </label>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Marque esta opção se os dados foram gerados automaticamente pelo sistema.
+                        </p>
+                    </div>
+
+                    <div className="flex justify-end items-center space-x-3 pt-4 border-t">
+                        <Button type="button" variant="secondary" onClick={() => navigate('/investidores')}>Cancelar</Button>
+                        <Button type="submit" variant="primary">{editingId ? 'Atualizar' : 'Criar Investidor'}</Button>
+                    </div>
+                </form>
+            </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <button className="btn-secondary" onClick={() => navigate(-1)}>Voltar</button>
-        </div>
-      </div>
-
-      <div className="card p-4">
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
-              <input {...register('nome_completo', { required: 'Nome completo é obrigatório' })} type="text" className="input mt-1" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Data de Nascimento *</label>
-              <input {...register('data_nascimento', { required: 'Data de nascimento é obrigatória', validate: validateAge })} type="date" className="input mt-1" max={format(subYears(new Date(), 18), 'yyyy-MM-dd')} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Nacionalidade *</label>
-              <input {...register('nacionalidade', { required: 'Nacionalidade é obrigatória' })} type="text" className="input mt-1" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Sexo *</label>
-              <select {...register('sexo', { required: 'Sexo é obrigatório' })} className="input mt-1">
-                <option value="">Selecionar sexo</option>
-                <option value="M">Masculino</option>
-                <option value="F">Feminino</option>
-                <option value="O">Outro</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Documentos simplificados */}
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Documentos</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Número do Passaporte *</label>
-                <input {...register('passaporte_numero', { required: 'Número do passaporte é obrigatório' })} type="text" className="input mt-1" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Validade do Passaporte *</label>
-                <input {...register('passaporte_validade', { required: 'Validade do passaporte é obrigatória' })} type="date" className="input mt-1" min={format(new Date(), 'yyyy-MM-dd')} />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Número do BI (opcional)</label>
-              <input {...register('bi_numero')} type="text" className="input mt-1" />
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700">Anexos (vários)</label>
-              <input {...register('anexos')} type="file" className="mt-1" multiple />
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Contacto</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Telefone</label>
-                <PhoneInput {...register('telefone')} />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Endereço</label>
-                <textarea {...register('endereco')} rows="3" className="input mt-1" />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t">
-            <button type="button" className="btn-secondary" onClick={() => navigate('/investidores')}>Cancelar</button>
-            <button type="submit" className="btn-primary">{editingId ? 'Atualizar' : 'Criar'} Investidor</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
 }
