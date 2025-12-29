@@ -136,6 +136,14 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        <Route path="/ver-investidores" element={
+          <ProtectedRoute>
+            <Layout>
+              <Investidores />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

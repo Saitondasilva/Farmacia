@@ -20,9 +20,10 @@ export const Sidebar = () => {
     { name: 'Dashboard', href: '/', icon: Home },
     //{ name: 'Equipamentos', href: '/equipamentos', icon: Monitor },
     //{ name: 'Marcas', href: '/marcas', icon: Monitor },
-    { name: 'Fomulario de Investimento', href: '/formulario-investimento', icon: Users },
+    //{ name: 'Fomulario de Investimento', href: '/formulario-investimento', icon: Users },
     //{ name: 'Departamentos', href: '/departamentos', icon: Building }, // NOVA
     { name: 'Investidores', href: '/investidores', icon: Truck },
+    { name: 'Ver Investidores', href: '/ver-investidores', icon: Truck },
     //{ name: 'Atribuições', href: '/atribuicoes', icon: ClipboardList },
     //{ name: 'Categorias', href: '/categorias', icon: Tags },
     //{ name: 'Histórico Movimentações', href: '/historico-movimentacoes', icon: History },
