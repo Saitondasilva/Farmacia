@@ -49,6 +49,13 @@ const MOCK_INVESTIDORES = [
   }
 ];
 
+const instituicoesDisponiveis = [
+  "Finanças",
+  "Ministério Público",
+  "Registro Civil",
+  "SEF",
+];
+
 const MOCK_DOCUMENTOS = [
   {
     id: 1,
@@ -78,13 +85,22 @@ export const Investidores = () => {
   const [documentos, setDocumentos] = useState([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
 
+  const [instituicoesSelecionadas, setInstituicoesSelecionadas] = useState([]);
+
+
   const statusOptions = [
     { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     { value: 'EM VERIFICAÇÃO', label: 'Em Verificação', color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
     { value: 'APROVADO', label: 'Aprovado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
     { value: 'REJEITADO', label: 'Rejeitado', color: 'bg-red-100 text-red-800', icon: XCircle },
     { value: 'ENVIADO', label: 'Enviado para Instituição', color: 'bg-purple-100 text-purple-800', icon: Send }
+
+    
   ];
+
+
+  const [showEnviarModal, setShowEnviarModal] = useState(false);
+const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
 
   const sexoOptions = [
     { value: 'M', label: 'Masculino' },
@@ -108,6 +124,16 @@ export const Investidores = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+
+  const toggleInstituicao = (instituicao) => {
+  setInstituicoesSelecionadas((prev) =>
+    prev.includes(instituicao)
+      ? prev.filter((i) => i !== instituicao)
+      : [...prev, instituicao]
+  );
+};
+
 
   /*const loadData = async () => {
     try {
@@ -403,7 +429,8 @@ export const Investidores = () => {
                       >
                         <FileText className="w-4 h-4" />
                       </button>
-                      {canSendToInstitution(investidor.status) && (
+
+                      {/*canSendToInstitution(investidor.status) && (
                         <button
                           onClick={() => handleEnviarParaInstituicao(investidor.id)}
                           className="text-purple-600 hover:text-purple-900"
@@ -411,7 +438,21 @@ export const Investidores = () => {
                         >
                           <Send className="w-4 h-4" />
                         </button>
+                      )*/}
+
+                      {canSendToInstitution(investidor.status) && (
+                        <button
+                          onClick={() => {
+                            setInvestidorSelecionado(investidor); // guarda o investidor
+                            setShowEnviarModal(true); // abre a modal
+                          }}
+                          className="text-purple-600 hover:text-purple-900"
+                          title="Enviar para instituições"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
                       )}
+
                       <button
                         onClick={() => handleDelete(investidor.id)}
                         className="text-red-600 hover:text-red-900"
@@ -438,6 +479,61 @@ export const Investidores = () => {
         )}
       </div>
 
+   <Modal
+  isOpen={showEnviarModal}
+  onClose={() => setShowEnviarModal(false)}
+  title="Confirmar Envio"
+>
+  <p className="mb-4">
+    Deseja realmente enviar os dados do investidor{" "}
+    <strong>{investidorSelecionado?.nome_completo}</strong> para as seguintes
+    instituições?
+  </p>
+
+  {/* Lista de instituições */}
+  <div className="space-y-2 mb-4">
+    {instituicoesDisponiveis.map((instituicao) => (
+      <label
+        key={instituicao}
+        className="flex items-center space-x-2 cursor-pointer"
+      >
+        <input
+          type="checkbox"
+          checked={instituicoesSelecionadas.includes(instituicao)}
+          onChange={() => toggleInstituicao(instituicao)}
+          className="w-4 h-4 text-purple-600"
+        />
+        <span>{instituicao}</span>
+      </label>
+    ))}
+  </div>
+
+  <div className="flex justify-end mt-4 space-x-3">
+    <button
+      className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+      onClick={() => setShowEnviarModal(false)}
+    >
+      Cancelar
+    </button>
+
+    <button
+      className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+      disabled={instituicoesSelecionadas.length === 0}
+      onClick={() => {
+        handleEnviarParaInstituicao(
+          investidorSelecionado.id,
+          instituicoesSelecionadas
+        );
+        setInstituicoesSelecionadas([]);
+        setShowEnviarModal(false);
+      }}
+    >
+      Confirmar Envio
+    </button>
+  </div>
+</Modal>
+
+
       {/* Modal de Detalhes - Visualizar todas as informações */}
       <Modal
         isOpen={showDetalhesModal}
@@ -450,7 +546,7 @@ export const Investidores = () => {
             {/* Informações Pessoais */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Informações Pessoais</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Nome Completo</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded border">{selectedInvestidor.nome_completo}</p>
@@ -481,7 +577,7 @@ export const Investidores = () => {
             {/* Documentos */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Documentos</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Número do Passaporte</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded border font-mono">{selectedInvestidor.passaporte_numero}</p>
@@ -500,7 +596,7 @@ export const Investidores = () => {
             {/* Contacto */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Contacto</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Email</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded border">{selectedInvestidor.email || 'N/A'}</p>
@@ -521,7 +617,7 @@ export const Investidores = () => {
             {/* Investimento */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Informações de Investimento</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Tipo</label>
                   <p className="mt-1 p-2 bg-gray-50 rounded border">

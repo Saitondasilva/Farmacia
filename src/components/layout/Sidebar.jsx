@@ -24,6 +24,7 @@ export const Sidebar = () => {
     //{ name: 'Departamentos', href: '/departamentos', icon: Building }, // NOVA
     { name: 'Investidores', href: '/investidores', icon: Truck },
     { name: 'Ver Investidores', href: '/ver-investidores', icon: Truck },
+    { name: 'Pagamento', href: '/ver-investidores', icon: Truck },
     //{ name: 'Atribuições', href: '/atribuicoes', icon: ClipboardList },
     //{ name: 'Categorias', href: '/categorias', icon: Tags },
     //{ name: 'Histórico Movimentações', href: '/historico-movimentacoes', icon: History },

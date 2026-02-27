@@ -1,271 +1,274 @@
 import { useState, useEffect } from 'react';
 import {
-    Monitor,
-    Users,
-    Truck,
-    Wrench,
-    DollarSign,
-    Calendar,
-    ClipboardCheck,
-    TrendingUp,
-    AlertTriangle
+  Monitor,
+  Users,
+  Truck,
+  Wrench,
+  DollarSign,
+  Calendar,
+  ClipboardCheck,
+  TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Legend
+} from 'recharts';
 
-import { estatisticasService } from '../services/estatisticasService';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { StatCard } from '../components/ui/StatCard';
-import { AlertaCard } from '../components/ui/AlertaCard';
 
 export const Dashboard = () => {
-    const [stats, setStats] = useState({});
-    const [alertas, setAlertas] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null); // inicialmente null para simular loading
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadDashboardData();
-    }, []);
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-    const loadDashboardData = async () => {
-        try {
-            setError(null);
-            const [statsRes, alertasRes] = await Promise.all([
-                estatisticasService.getDashboardStats(),
-                estatisticasService.getAlertasSistema()
-            ]);
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Simulação de dados fixos
+      const fakeData = {
+        equipamentos_disponiveis: 10,
+        equipamentos_em_uso: 5,
+        equipamentos_manutencao: 2,
+        equipamentos_descartados: 1,
+        funcionarios_ativos: 8,
+        departamentos_ativos: 3,
+        valor_total_equipamentos: 500000,
+        total_fornecedores: 4,
+        atribuicoes_ativas: 5,
+        manutencoes_pendentes: 2
+      };
 
-            setStats(statsRes.data || {});
+      // Simular atraso para testar LoadingSpinner
+      await new Promise(res => setTimeout(res, 500));
 
-            // Garantir que alertas é um array
-            const alertasData = alertasRes.data || [];
-            setAlertas(Array.isArray(alertasData) ? alertasData : []);
-        } catch (error) {
-            console.error('Erro ao carregar dados do dashboard:', error);
-            setError('Erro ao carregar dados do dashboard');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <LoadingSpinner size="lg" />
-            </div>
-        );
+      setStats(fakeData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (error) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                    <AlertTriangle className="mx-auto h-12 w-12 text-red-500" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">Erro ao carregar</h3>
-                    <p className="mt-1 text-sm text-gray-500">{error}</p>
-                    <button
-                        onClick={loadDashboardData}
-                        className="mt-4 btn-primary"
-                    >
-                        Tentar Novamente
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // Calcular totais de forma segura
-    const totalEquipamentosAtivos = (stats.equipamentos_disponiveis || 0) +
-        (stats.equipamentos_em_uso || 0) +
-        (stats.equipamentos_manutencao || 0);
-
-    const totalEquipamentos = totalEquipamentosAtivos + (stats.equipamentos_descartados || 0);
-
-    const taxaUtilizacao = totalEquipamentosAtivos > 0
-        ? ((stats.equipamentos_em_uso || 0) / totalEquipamentosAtivos * 100)
-        : 0;
-
-    const totalAlertas = alertas.reduce((sum, alerta) => sum + (parseInt(alerta.quantidade) || 0), 0);
-
+  if (loading || !stats) {
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                    <p className="text-gray-600">Visão geral do sistema de gestão de estoque de equipamentos</p>
-                </div>
-                <div className="text-sm text-gray-500">
-                    Atualizado em {new Date().toLocaleDateString('pt-PT')}
-                </div>
-            </div>
-
-            {/* Alertas */}
-            {/*totalAlertas > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                        <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
-                        Alertas do Sistema
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {alertas.map((alerta, index) => (
-                            <AlertaCard
-                                key={index}
-                                tipo={alerta.tipo_alerta}
-                                quantidade={parseInt(alerta.quantidade) || 0}
-                                equipamentos={alerta.equipamentos || alerta.departamentos}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )*/}
-
-            {/* Estatísticas Principais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="Equipamentos Disponíveis"
-                    value={stats.equipamentos_disponiveis || 0}
-                    subtitle={`Total: ${totalEquipamentos} equipamentos`}
-                    icon={Monitor}
-                    color="green"
-                />
-                <StatCard
-                    title="Em Uso"
-                    value={stats.equipamentos_em_uso || 0}
-                    subtitle={`${stats.atribuicoes_ativas || 0} atribuições ativas`}
-                    icon={TrendingUp}
-                    color="blue"
-                />
-                <StatCard
-                    title="Em Manutenção"
-                    value={stats.equipamentos_manutencao || 0}
-                    subtitle={`${stats.manutencoes_pendentes || 0} pendentes`}
-                    icon={Wrench}
-                    color="yellow"
-                />
-                <StatCard
-                    title="Funcionários Ativos"
-                    value={stats.funcionarios_ativos || 0}
-                    subtitle={`${stats.departamentos_ativos || 0} departamentos`}
-                    icon={Users}
-                    color="purple"
-                />
-            </div>
-
-            {/* Segunda Linha de Estatísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                    title="Valor Total"
-                    value={stats.valor_total_equipamentos ? `STN${(stats.valor_total_equipamentos / 1000).toFixed(1)}k` : 'STN0'}
-                    subtitle="Investimento em equipamentos"
-                    icon={DollarSign}
-                    color="indigo"
-                />
-                <StatCard
-                    title="Fornecedores"
-                    value={stats.total_fornecedores || 0}
-                    subtitle="Parceiros ativos"
-                    icon={Truck}
-                    color="green"
-                />
-                <StatCard
-                    title="Atribuições Ativas"
-                    value={stats.atribuicoes_ativas || 0}
-                    subtitle="Equipamentos em uso"
-                    icon={ClipboardCheck}
-                    color="blue"
-                />
-                <StatCard
-                    title="Manutenções Pendentes"
-                    value={stats.manutencoes_pendentes || 0}
-                    subtitle="Aguardando resolução"
-                    icon={AlertTriangle}
-                    color="red"
-                />
-            </div>
-
-            {/* Gráficos e Detalhes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Distribuição por Estado */}
-                <div className="card p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Distribuição de Equipamentos</h3>
-                    <div className="space-y-3">
-                        {[
-                            { label: 'Disponíveis', value: stats.equipamentos_disponiveis || 0, color: 'bg-green-500' },
-                            { label: 'Em Uso', value: stats.equipamentos_em_uso || 0, color: 'bg-blue-500' },
-                            { label: 'Em Manutenção', value: stats.equipamentos_manutencao || 0, color: 'bg-yellow-500' },
-                            { label: 'Descartados', value: stats.equipamentos_descartados || 0, color: 'bg-red-500' }
-                        ].map((item, index) => {
-                            const percentage = totalEquipamentos > 0 ? (item.value / totalEquipamentos) * 100 : 0;
-
-                            return (
-                                <div key={index} className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <div className={`w-3 h-3 rounded-full ${item.color}`}></div>
-                                        <span className="text-sm text-gray-600">{item.label}</span>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <div className="w-32 bg-gray-200 rounded-full h-2">
-                                            <div
-                                                className={`h-2 rounded-full ${item.color}`}
-                                                style={{ width: `${percentage}%` }}
-                                            ></div>
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-900 w-12 text-right">
-                                            {item.value} ({percentage.toFixed(1)}%)
-                                        </span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Resumo do Sistema */}
-                <div className="card p-6">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Resumo do Sistema</h3>
-                    <div className="space-y-4 text-sm text-gray-600">
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span>Total de Equipamentos Ativos:</span>
-                            <span className="font-semibold text-gray-900">{totalEquipamentosAtivos}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span>Taxa de Utilização:</span>
-                            <span className="font-semibold text-blue-600">
-                                {taxaUtilizacao.toFixed(1)}%
-                            </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span>Departamentos Ativos:</span>
-                            <span className="font-semibold text-gray-900">{stats.departamentos_ativos || 0}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                            <span>Fornecedores Registados:</span>
-                            <span className="font-semibold text-gray-900">{stats.total_fornecedores || 0}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2">
-                            <span>Valor Total em Equipamentos:</span>
-                            <span className="font-semibold text-gray-900">
-                                {stats.valor_total_equipamentos ? `€${(stats.valor_total_equipamentos).toLocaleString('pt-PT')}` : '€0'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Botão de Atualização */}
-            <div className="flex justify-center">
-                <button
-                    onClick={loadDashboardData}
-                    className="btn-secondary flex items-center space-x-2"
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <LoadingSpinner size="sm" />
-                    ) : (
-                        <Calendar className="w-4 h-4" />
-                    )}
-                    <span>{loading ? 'A Atualizar...' : 'Atualizar Dados'}</span>
-                </button>
-            </div>
-        </div>
+      <div className="flex items-center justify-center h-64">
+        <LoadingSpinner size="lg" />
+      </div>
     );
+  }
+
+  // Cálculos principais
+  const totalEquipamentosAtivos =
+    stats.equipamentos_disponiveis +
+    stats.equipamentos_em_uso +
+    stats.equipamentos_manutencao;
+
+  const totalEquipamentos =
+    totalEquipamentosAtivos + stats.equipamentos_descartados;
+
+  const taxaUtilizacao =
+    totalEquipamentosAtivos > 0
+      ? (stats.equipamentos_em_uso / totalEquipamentosAtivos) * 100
+      : 0;
+
+  // Dados para gráficos
+  const equipamentosPorEstado = [
+    { name: 'Disponíveis', value: stats.equipamentos_disponiveis },
+    { name: 'Em Uso', value: stats.equipamentos_em_uso },
+    { name: 'Manutenção', value: stats.equipamentos_manutencao },
+    { name: 'Descartados', value: stats.equipamentos_descartados }
+  ];
+
+  const utilizacaoData = [
+    { name: 'Em Uso', value: stats.equipamentos_em_uso },
+    { name: 'Disponíveis', value: stats.equipamentos_disponiveis }
+  ];
+
+  const COLORS = ['#22c55e', '#3b82f6', '#facc15', '#ef4444'];
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">
+            Visão geral do sistema de gestão de Investidores
+          </p>
+        </div>
+        <div className="text-sm text-gray-500">
+          Atualizado em {new Date().toLocaleDateString('pt-PT')}
+        </div>
+      </div>
+
+      {/* Estatísticas principais */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Investidores inscritos"
+          value={stats.equipamentos_disponiveis}
+          subtitle={`Total: ${totalEquipamentos} equipamentos`}
+          icon={Monitor}
+          color="green"
+        />
+        <StatCard
+          title="Em Uso"
+          value={stats.equipamentos_em_uso}
+          subtitle={`${stats.atribuicoes_ativas} atribuições ativas`}
+          icon={TrendingUp}
+          color="blue"
+        />
+        <StatCard
+          title="Solicitação em Espera"
+          value={stats.equipamentos_manutencao}
+          subtitle={`${stats.manutencoes_pendentes} pendentes`}
+          icon={Wrench}
+          color="yellow"
+        />
+        <StatCard
+          title="Solicitação Aceites"
+          value={stats.funcionarios_ativos}
+          subtitle={`${stats.departamentos_ativos} departamentos`}
+          icon={Users}
+          color="purple"
+        />
+      </div>
+
+      {/* Segunda linha */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Valor Total"
+          value={`STN${(stats.valor_total_equipamentos / 1000).toFixed(1)}k`}
+          subtitle="Investimento em equipamentos"
+          icon={DollarSign}
+          color="indigo"
+        />
+        <StatCard
+          title="Fornecedores"
+          value={stats.total_fornecedores}
+          subtitle="Parceiros ativos"
+          icon={Truck}
+          color="green"
+        />
+        <StatCard
+          title="Atribuições Ativas"
+          value={stats.atribuicoes_ativas}
+          subtitle="Equipamentos em uso"
+          icon={ClipboardCheck}
+          color="blue"
+        />
+        <StatCard
+          title="investidores pendentes"
+          value={stats.manutencoes_pendentes}
+          subtitle="Aguardando resolução"
+          icon={AlertTriangle}
+          color="red"
+        />
+      </div>
+
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pizza */}
+        <div className="card p-6 min-h-[350px]">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+           Estatisticas em relação aos pedidos
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={equipamentosPorEstado}
+                dataKey="value"
+                nameKey="name"
+                outerRadius={100}
+                label
+              >
+                {equipamentosPorEstado.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index]} />
+                ))}
+              </Pie>
+              <Tooltip />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Barras */}
+        <div className="card p-6 min-h-[350px]">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+           Em verrificação
+          </h3>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={utilizacaoData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="value" fill="#3b82f6" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="card p-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Resumo dos Investidores
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Aceites
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Pendentes
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Em verrificação
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {equipamentosPorEstado.map((item, index) => {
+                const percent = ((item.value / totalEquipamentos) * 100).toFixed(1);
+                return (
+                  <tr key={index}>
+                    <td className="px-6 py-4 text-sm text-gray-900">{item.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{item.value}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{percent}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Botão Atualizar */}
+      <div className="flex justify-center">
+        <button
+          onClick={loadDashboardData}
+          className="btn-secondary flex items-center space-x-2"
+          disabled={loading}
+        >
+          {loading ? <LoadingSpinner size="sm" /> : <Calendar className="w-4 h-4" />}
+          <span>{loading ? 'A Atualizar...' : 'Atualizar Dados'}</span>
+        </button>
+      </div>
+    </div>
+  );
 };
