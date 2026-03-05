@@ -1,11 +1,12 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import { useForm } from 'react-hook-form';
-import { FileText } from 'lucide-react';
+import { FileText, CheckCircle, RefreshCw,Copy } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { format, parseISO, subYears, differenceInYears } from 'date-fns';
 //import { ptBR } from 'date-fns/locale';
 import { PhoneInput } from '../components/ui/PhoneInput';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { generateInvestmentCode} from '../utils/generateInvestmentCode';
 
 const validateAge = (dateString) => {
     if (!dateString) return true;
@@ -38,15 +39,42 @@ const MOCK_DOCUMENTOS = [
     }
 ];
 
+// Funções auxiliares para salvar/atualizar investidores
+const saveInvestidor = (dados) => {
+    const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+    stored.push(dados);
+    localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(stored));
+    return dados;
+};
+
+const updateInvestidor = (id, dados) => {
+    const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+    const updated = stored.map(i => (String(i.id) === String(id) ? { ...i, ...dados } : i));
+    localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(updated));
+    return dados;
+};
+
+const processFiles = async (files) => {
+    if (!files) return [];
+    // Implementar lógica de upload se necessário
+    return Array.from(files).map(file => ({
+        nome: file.name,
+        tamanho: file.size,
+        tipo: file.type,
+        data_upload: new Date().toISOString()
+    }));
+};
 
 export default function FormularioInvestimento() {
     const [editingInvestidor, setEditingInvestidor] = useState(null);
+    const [codigoGerado, setCodigoGerado] = useState('');
+    const [showCodeAlert, setShowCodeAlert] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
     const params = new URLSearchParams(location.search);
     const editingId = params.get('id');
 
-    const { register, handleSubmit, reset, formState: { errors }, watch } = useForm({
+    const { register, handleSubmit, reset, formState: { errors }, watch, setValue } = useForm({
         defaultValues: {
             status: 'PENDENTE',
             preenchimento_automatico: false
@@ -66,11 +94,13 @@ export default function FormularioInvestimento() {
         { value: 'DOAÇÃO', label: 'Doação' }
     ];
 
+    // Effect para carregar dados quando editando
     React.useEffect(() => {
         if (editingId) {
             const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
             const inv = stored.find(i => String(i.id) === String(editingId));
             if (inv) {
+                setEditingInvestidor(inv);
                 reset({
                     ...inv,
                     data_nascimento: inv.data_nascimento ? format(parseISO(inv.data_nascimento), 'yyyy-MM-dd') : '',
@@ -80,34 +110,119 @@ export default function FormularioInvestimento() {
         }
     }, [editingId, reset]);
 
-    const onSubmit = (data) => {
-        const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-        if (editingId) {
-            const updated = stored.map(i => (String(i.id) === String(editingId) ? { ...i, ...data } : i));
-            localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(updated));
-        } else {
-            const novo = { ...data, id: Date.now(), valor_investimento: parseFloat(data.valor_investimento || 0) };
-            stored.push(novo);
-            localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(stored));
+    // Effect para gerar código quando é novo registro
+    useEffect(() => {
+        if (!editingId) {
+            const novoCodigo = generateInvestmentCode();
+            setCodigoGerado(novoCodigo);
         }
+    }, [editingId]);
 
-        navigate('/investidores');
+    // Função para regenerar código
+    const regenerarCodigo = () => {
+        if (!editingId && window.confirm('Gerar novo código? O código anterior será perdido.')) {
+            setCodigoGerado(generateInvestmentCode());
+        }
+    };
+
+    const onSubmit = async (data) => {
+        try {
+            // Processar arquivos primeiro
+            let anexosProcessados = [];
+            if (data.anexos && data.anexos.length > 0) {
+                anexosProcessados = await processFiles(data.anexos);
+            }
+
+            // Preparar dados completos
+            const dadosCompletos = {
+                ...data,
+                id: editingId ? parseInt(editingId) : Date.now(),
+                codigo_identificacao: editingId ? data.codigo_identificacao : codigoGerado,
+                data_submissao: editingId ? data.data_submissao : new Date().toISOString(),
+                data_atualizacao: new Date().toISOString(),
+                valor_investimento: parseFloat(data.valor_investimento || 0),
+                anexos: anexosProcessados,
+            };
+
+            // Salvar dados
+            if (editingId) {
+                await updateInvestidor(editingId, dadosCompletos);
+            } else {
+                await saveInvestidor(dadosCompletos);
+                setShowCodeAlert(true);
+            }
+
+            // Navegar com mensagem de sucesso
+            navigate('/investidores', { 
+                state: { 
+                    message: editingId ? 'Investidor atualizado com sucesso!' : 'Investidor criado com sucesso!',
+                    codigo: dadosCompletos.codigo_identificacao 
+                }
+            });
+            
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            alert('Erro ao salvar os dados. Tente novamente.');
+        }
     };
 
     return (
         <div className="space-y-6">
+            {/* Alert de sucesso com código */}
+            {showCodeAlert && (
+                <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-md">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <CheckCircle className="h-5 w-5 text-green-400" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-green-700">
+                                Investidor criado com sucesso! 
+                                <br />
+                                <strong>Código de identificação: {codigoGerado}</strong>
+                                <br />
+                                <span className="text-xs">Guarde este código para referência futura</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Formulário de Investimento</h1>
                     <p className="text-gray-600">Preencha os dados do investidor</p>
                 </div>
                 <div className="flex items-center space-x-2">
+                    {!editingId && codigoGerado && (
+                        <div className="bg-blue-50 px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <span className="text-sm text-gray-600">Código:</span>
+                            <span className="font-mono font-bold text-blue-700">{codigoGerado}</span>
+                            <button
+                                type="button"
+                                onClick={regenerarCodigo}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                title="Gerar novo código"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
                     <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>Voltar</Button>
                 </div>
             </div>
 
             <div className="card p-4">
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Campo hidden para o código (quando editando) */}
+                    {!editingId && (
+                        <input 
+                            type="hidden" 
+                            {...register('codigo_identificacao')} 
+                            value={codigoGerado}
+                        />
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700">Nome Completo *</label>
@@ -213,7 +328,7 @@ export default function FormularioInvestimento() {
                         </div>
 
                         <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">Anexos *</label>
+                            <label className="block text-sm font-medium text-gray-700">Anexos</label>
                             <input {...register('anexos')} type="file" className="mt-1" multiple />
                             {watch('anexos') && watch('anexos').length > 0 ? (
                                 <ul className="mt-2 text-sm text-gray-700 space-y-1">

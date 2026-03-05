@@ -2,7 +2,7 @@ import { ReactKeycloakProvider } from '@react-keycloak/web';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import keycloak from './keycloak/keycloak-config';
 import { useKeycloak } from '@react-keycloak/web';
-import { AuthProvider} from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import Callback from './Callback';
 import { Toaster } from 'sonner';
 import { Layout } from './components/layout/Layout';
@@ -12,6 +12,11 @@ import { Dashboard } from './pages/Dashboard';
 import { FomularioInvestimento } from './pages/Funcionarios';
 import FormularioInvestimento from './pages/FormularioInvestimento';
 import { Investidores } from './pages/Fornecedores';
+import { MinisterioPublico } from './pages/ministerioPublico';
+import { MinistraJustica } from './pages/ministraJustica';  // <-- AGORA É MinistraJustica
+import { ConselhoMinistro } from './pages/ConselhoMinistros';
+import { PresidenciaRepublica } from './pages/PresidenciaR';
+import { Repografia } from './pages/Repografia';
 //import { Atribuicoes } from './pages/Atribuicoes';
 //import { Categorias } from './pages/Categorias';
 //import { Relatorios } from './pages/Relatorios';
@@ -140,6 +145,46 @@ function AppRoutes() {
           <ProtectedRoute>
             <Layout>
               <Investidores />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/ministerio-publico" element={
+          <ProtectedRoute>
+            <Layout>
+              <MinisterioPublico />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/ministra-justica" element={
+          <ProtectedRoute>
+            <Layout>
+              <MinistraJustica />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/conselho-ministro" element={
+          <ProtectedRoute>
+            <Layout>
+              <ConselhoMinistro />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/presidencia" element={
+          <ProtectedRoute>
+            <Layout>
+              <PresidenciaRepublica />
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/repografia" element={
+          <ProtectedRoute>
+            <Layout>
+              <Repografia />
             </Layout>
           </ProtectedRoute>
         } />

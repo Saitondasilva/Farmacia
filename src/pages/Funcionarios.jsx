@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Copy } from 'lucide-react';
 
 const DEFAULT_INVESTIDORES = [
   {
@@ -163,6 +164,7 @@ export const FomularioInvestimento = () => {
             <table className="min-w-full table-auto">
               <thead>
                 <tr>
+                   <th className="text-left px-3 py-2">Código</th>
                   <th className="text-left px-3 py-2">Nome Completo</th>
                   <th className="text-left px-3 py-2">Nacionalidade</th>
                   <th className="text-left px-3 py-2">Passaporte</th>
@@ -177,6 +179,21 @@ export const FomularioInvestimento = () => {
               <tbody className="divide-y divide-gray-200">
                 {filteredInvestidores.map(inv => (
                   <tr key={inv.id} className="align-top">
+             <td className="px-3 py-2 align-top whitespace-nowrap"><div className="flex items-center space-x-1"><span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{inv.codigo_identificacao || 'N/A'}</span>
+              {inv.codigo_identificacao && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(inv.codigo_identificacao);
+                    alert('Código copiado!');
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                  title="Copiar código"
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </td>
                     <td className="px-3 py-2 align-top font-medium whitespace-nowrap">{inv.nome_completo}</td>
                     <td className="px-3 py-2 align-top whitespace-nowrap"><span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><Flag className="w-3 h-3 mr-1" />{inv.nacionalidade}</span></td>
                     <td className="px-3 py-2 align-top whitespace-nowrap"><div className="font-mono text-sm">{inv.passaporte_numero}</div>{inv.passaporte_validade && <div className="text-xs text-gray-500">Validade: {formatDate(inv.passaporte_validade)}</div>}</td>

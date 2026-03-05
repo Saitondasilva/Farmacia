@@ -1,16 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Edit, Trash2, FileText, Eye, Send, CheckCircle, XCircle, Clock, AlertCircle, Download } from 'lucide-react';
+import { 
+  Plus, Search, Edit, Trash2, FileText, Eye, Send, 
+  CheckCircle, XCircle, Clock, AlertCircle, Download, 
+  Users, Flag, Copy 
+} from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-//import { investidoresService } from '../services/investidoresService';
-//import { documentosService } from '../services/documentosService';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 
+// Dados Mock
 const MOCK_INVESTIDORES = [
   {
     id: 1,
+    codigo_identificacao: 'INV-20250303-0001',
     nome_completo: 'João Manuel Silva',
     data_nascimento: '1985-06-15',
     nacionalidade: 'Portuguesa',
@@ -19,17 +24,24 @@ const MOCK_INVESTIDORES = [
     passaporte_numero: 'P1234567',
     passaporte_validade: '2030-12-31',
     bi_numero: '12345678LA',
-    email: 'joao@email.com',
+    email: 'joao.silva@email.com',
     telefone: '+351912345678',
     endereco: 'Lisboa, Portugal',
     tipo: 'INVESTIMENTO',
     valor_investimento: 150000,
     status: 'PENDENTE',
     observacoes: 'Investidor VIP',
-    preenchimento_automatico: false
+    preenchimento_automatico: false,
+    workflow: {
+      status_global: 'em_andamento',
+      instituicao_atual: 'ucid',
+      historico: [],
+      timeline: []
+    }
   },
   {
     id: 2,
+    codigo_identificacao: 'INV-20250303-0002',
     nome_completo: 'Maria Fernanda Costa',
     data_nascimento: '1990-02-20',
     nacionalidade: 'Brasileira',
@@ -38,22 +50,33 @@ const MOCK_INVESTIDORES = [
     passaporte_numero: 'BR998877',
     passaporte_validade: '2029-05-10',
     bi_numero: '',
-    email: 'maria@email.com',
+    email: 'maria.costa@email.com',
     telefone: '+551199999999',
     endereco: 'São Paulo, Brasil',
     tipo: 'DOAÇÃO',
     valor_investimento: 90000,
     status: 'ENVIADO',
     observacoes: '',
-    preenchimento_automatico: false
+    preenchimento_automatico: false,
+    workflow: {
+      status_global: 'em_andamento',
+      instituicao_atual: 'mp',
+      historico: [
+        {
+          instituicao: 'mp',
+          data_recebimento: '2025-03-03T10:30:00',
+          data_analise: null,
+          status: 'AGUARDANDO',
+          observacoes: '',
+          encaminhado_para: null,
+          lido: false
+        }
+      ],
+      timeline: [
+        { data: '2025-03-03T10:30:00', evento: 'Enviado para Ministério Público', instituicao: 'ucid' }
+      ]
+    }
   }
-];
-
-const instituicoesDisponiveis = [
-  "Finanças",
-  "Ministério Público",
-  "Registro Civil",
-  "SEF",
 ];
 
 const MOCK_DOCUMENTOS = [
@@ -73,34 +96,45 @@ const MOCK_DOCUMENTOS = [
   }
 ];
 
+const instituicoesDisponiveis = [
+  { id: 'mp', nome: 'Ministério Público' },
+  { id: 'mj', nome: 'Ministério da Justiça' },
+  { id: 'cm', nome: 'Câmara Municipal' },
+  { id: 'financas', nome: 'Finanças' },
+  { id: 'sef', nome: 'SEF' },
+  { id: 'registro', nome: 'Registro Civil' }
+];
 
 export const Investidores = () => {
+  const navigate = useNavigate();
+  
+  // Estados principais
   const [investidores, setInvestidores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
-  const [showDocumentosModal, setShowDocumentosModal] = useState(false);
-  const [selectedInvestidor, setSelectedInvestidor] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  
+  // Estados para modais
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [showDocumentosModal, setShowDocumentosModal] = useState(false);
+  const [showEnviarModal, setShowEnviarModal] = useState(false);
+  const [selectedInvestidor, setSelectedInvestidor] = useState(null);
+  const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
+  
+  // Estados para documentos
   const [documentos, setDocumentos] = useState([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
-
   const [instituicoesSelecionadas, setInstituicoesSelecionadas] = useState([]);
-
+  const [copiedCode, setCopiedCode] = useState(null);
 
   const statusOptions = [
     { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
     { value: 'EM VERIFICAÇÃO', label: 'Em Verificação', color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
     { value: 'APROVADO', label: 'Aprovado', color: 'bg-green-100 text-green-800', icon: CheckCircle },
     { value: 'REJEITADO', label: 'Rejeitado', color: 'bg-red-100 text-red-800', icon: XCircle },
-    { value: 'ENVIADO', label: 'Enviado para Instituição', color: 'bg-purple-100 text-purple-800', icon: Send }
-
-    
+    { value: 'ENVIADO', label: 'Enviado para Instituição', color: 'bg-purple-100 text-purple-800', icon: Send },
+    { value: 'SUSPENSO', label: 'Suspenso', color: 'bg-gray-100 text-gray-800', icon: AlertCircle }
   ];
-
-
-  const [showEnviarModal, setShowEnviarModal] = useState(false);
-const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
 
   const sexoOptions = [
     { value: 'M', label: 'Masculino' },
@@ -121,123 +155,66 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
     { value: 'DOAÇÃO', label: 'Doação' }
   ];
 
+  // Carregar dados
   useEffect(() => {
     loadData();
   }, []);
 
-
-  const toggleInstituicao = (instituicao) => {
-  setInstituicoesSelecionadas((prev) =>
-    prev.includes(instituicao)
-      ? prev.filter((i) => i !== instituicao)
-      : [...prev, instituicao]
-  );
-};
-
-
-  /*const loadData = async () => {
+  const loadData = () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const investidoresRes = await investidoresService.getAll();
-      setInvestidores(investidoresRes.data);
+      const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+      
+      if (stored.length === 0) {
+        setInvestidores(MOCK_INVESTIDORES);
+        localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(MOCK_INVESTIDORES));
+      } else {
+        setInvestidores(stored);
+      }
     } catch (error) {
-      console.error('Erro ao carregar investidores:', error);
-      alert('Erro ao carregar dados: ' + error.response?.data?.message);
+      console.error('Erro ao carregar dados:', error);
+      setInvestidores(MOCK_INVESTIDORES);
     } finally {
       setLoading(false);
     }
-  };*/
-
-  const loadData = async () => {
-    setLoading(true);
-    setTimeout(() => {
-      setInvestidores(MOCK_INVESTIDORES);
-      setLoading(false);
-    }, 500);
   };
 
-  /*const loadDocumentos = async (investidorId) => {
-    try {
-      const documentosRes = await documentosService.getByInvestidor(investidorId);
-      setDocumentos(documentosRes.data);
-    } catch (error) {
-      console.error('Erro ao carregar documentos:', error);
-    }
-  };*/
-
-  const loadDocumentos = async (investidorId) => {
-    const docs = MOCK_DOCUMENTOS.filter(
-      d => d.investidor_id === investidorId
-    );
+  const loadDocumentos = (investidorId) => {
+    const docs = MOCK_DOCUMENTOS.filter(d => d.investidor_id === investidorId);
     setDocumentos(docs);
   };
 
-  const filteredInvestidores = investidores.filter(investidor => {
-    const matchesSearch =
-      investidor.nome_completo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      investidor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      investidor.passaporte_numero?.toLowerCase().includes(searchTerm.toLowerCase());
+  const save = (next) => {
+    setInvestidores(next);
+    localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(next));
+  };
 
-    const matchesStatus = !filterStatus || investidor.status === filterStatus;
+  // Handlers de navegação
+  const handleCreate = () => navigate('/formulario-investimento');
+  const handleEdit = (inv) => navigate(`/formulario-investimento?id=${inv.id}`);
 
-    return matchesSearch && matchesStatus;
-  });
+  // Handlers de ações
+  const handleDelete = (id) => {
+    if (!confirm('Tem certeza que deseja eliminar este investidor?')) return;
+    save(investidores.filter(i => i.id !== id));
+  };
 
   const handleViewDetalhes = (investidor) => {
     setSelectedInvestidor(investidor);
     setShowDetalhesModal(true);
   };
 
-  const handleDocumentos = async (investidor) => {
+  const handleDocumentos = (investidor) => {
     setSelectedInvestidor(investidor);
-    await loadDocumentos(investidor.id);
+    loadDocumentos(investidor.id);
     setShowDocumentosModal(true);
   };
 
-  /* const handleDelete = async (id) => {
-     if (!confirm('Tem certeza que deseja eliminar este investidor?')) return;
- 
-     try {
-       await investidoresService.delete(id);
-       await loadData();
-     } catch (error) {
-       alert('Erro ao eliminar investidor: ' + error.response?.data?.message);
-     }
-   };*/
-
-  const handleDelete = (id) => {
-    if (!confirm('Tem certeza que deseja eliminar este investidor?')) return;
-    setInvestidores(prev => prev.filter(i => i.id !== id));
-  };
-
-  /*const handleUploadDocumento = async (e, investidorId) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      setUploadingDoc(true);
-      const formData = new FormData();
-      formData.append('arquivo', file);
-      formData.append('investidor_id', investidorId);
-      formData.append('tipo', 'OUTROS');
-      formData.append('descricao', `Documento enviado: ${file.name}`);
-
-      await documentosService.upload(formData);
-      await loadDocumentos(investidorId);
-      alert('Documento enviado com sucesso!');
-    } catch (error) {
-      alert('Erro ao enviar documento: ' + error.response?.data?.message);
-    } finally {
-      setUploadingDoc(false);
-    }
-  };*/
-
-  const handleUploadDocumento = async (e, investidorId) => {
+  const handleUploadDocumento = (e, investidorId) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setUploadingDoc(true);
-
     setTimeout(() => {
       setDocumentos(prev => [
         ...prev,
@@ -250,57 +227,86 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
         }
       ]);
       setUploadingDoc(false);
-      alert('Documento enviado (mock)');
+      alert('Documento enviado com sucesso!');
     }, 800);
   };
 
-  /*const handleDownloadDocumento = async (documento) => {
-    try {
-      const response = await documentosService.download(documento.id);
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', documento.nome_arquivo);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      alert('Erro ao baixar documento: ' + error.response?.data?.message);
-    }
-  };*/
-
   const handleDownloadDocumento = (documento) => {
-    alert(`Download mock do ficheiro: ${documento.nome_arquivo}`);
+    alert(`Download do ficheiro: ${documento.nome_arquivo}`);
   };
 
-  /*const handleEnviarParaInstituicao = async (investidorId) => {
-    if (!confirm('Deseja enviar este investidor para as instituições? Esta ação não pode ser desfeita.')) return;
-
-    try {
-      await investidoresService.update(investidorId, {
-        status: 'ENVIADO'
-      });
-      await loadData();
-      alert('Investidor enviado para as instituições com sucesso!');
-    } catch (error) {
-      alert('Erro ao enviar para instituição: ' + error.response?.data?.message);
-    }
-  };*/
-
-  const handleEnviarParaInstituicao = (investidorId) => {
+  const handleEnviarParaInstituicao = (investidorId, instituicoes) => {
     if (!confirm('Deseja enviar este investidor para as instituições?')) return;
 
-    setInvestidores(prev =>
-      prev.map(i =>
-        i.id === investidorId
-          ? { ...i, status: 'ENVIADO' }
-          : i
-      )
-    );
+    const dataEnvio = new Date().toISOString();
+    
+    const updated = investidores.map(inv => {
+      if (inv.id === investidorId) {
+        // Criar histórico de envios
+        const historico = instituicoes.map(inst => ({
+          instituicao: inst.id,
+          data_recebimento: dataEnvio,
+          data_analise: null,
+          status: 'AGUARDANDO',
+          observacoes: '',
+          encaminhado_para: null,
+          lido: false
+        }));
 
-    alert('Investidor enviado (mock)');
+        // Criar timeline
+        const timeline = instituicoes.map(inst => ({
+          data: dataEnvio,
+          evento: `Enviado para ${inst.nome}`,
+          instituicao: 'ucid'
+        }));
+
+        return {
+          ...inv,
+          status: 'ENVIADO',
+          workflow: {
+            status_global: 'em_andamento',
+            instituicao_atual: instituicoes[0]?.id || '',
+            historico: [...(inv.workflow?.historico || []), ...historico],
+            timeline: [...(inv.workflow?.timeline || []), ...timeline]
+          }
+        };
+      }
+      return inv;
+    });
+
+    save(updated);
+    alert('Investidor enviado com sucesso!');
   };
 
+  const copyToClipboard = (code, id) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(id);
+    setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const toggleInstituicao = (instituicao) => {
+    setInstituicoesSelecionadas((prev) =>
+      prev.includes(instituicao)
+        ? prev.filter((i) => i !== instituicao)
+        : [...prev, instituicao]
+    );
+  };
+
+  // Filtros
+  const filteredInvestidores = investidores.filter(investidor => {
+    const q = searchTerm.trim().toLowerCase();
+    const matchesSearch = !q || (
+      investidor.nome_completo?.toLowerCase().includes(q) ||
+      investidor.email?.toLowerCase().includes(q) ||
+      investidor.passaporte_numero?.toLowerCase().includes(q) ||
+      investidor.bi_numero?.toLowerCase().includes(q) ||
+      investidor.codigo_identificacao?.toLowerCase().includes(q)
+    );
+    const matchesStatus = !filterStatus || investidor.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  // Utilitários
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -336,14 +342,19 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Cabeçalho */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Ver Investidores</h1>
-          <p className="text-gray-600">Visualizar e enviar investidores para instituições</p>
+          <h1 className="text-2xl font-bold text-gray-900">Investidores</h1>
+          <p className="text-gray-600">Gerir investidores e acompanhar processos</p>
         </div>
+        <Button onClick={handleCreate}>
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Investidor
+        </Button>
       </div>
 
-      {/* Filtros e Pesquisa */}
+      {/* Filtros */}
       <div className="card p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
@@ -351,7 +362,7 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Pesquisar por nome, email ou passaporte..."
+                placeholder="Pesquisar por nome, email, passaporte, BI ou código..."
                 className="input pl-10"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -375,166 +386,281 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
         </div>
       </div>
 
-      {/* Tabela */}
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome Completo</th>
-              <th>Nacionalidade</th>
-              <th>Passaporte</th>
-              <th>Valor (USD)</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredInvestidores.map((investidor) => {
-              const StatusIcon = statusOptions.find(s => s.value === investidor.status)?.icon || AlertCircle;
+      {/* Lista Mobile */}
+      {filteredInvestidores.length === 0 ? (
+        <div className="text-center py-12">
+          <Users className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum investidor encontrado</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm || filterStatus ? 'Tente alterar os filtros de pesquisa.' : 'Comece por adicionar um novo investidor.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Mobile View */}
+          <div className="sm:hidden space-y-3">
+            {filteredInvestidores.map(inv => {
+              const StatusIcon = statusOptions.find(s => s.value === inv.status)?.icon || AlertCircle;
               return (
-                <tr key={investidor.id}>
-                  <td className="font-medium">{investidor.nome_completo}</td>
-                  <td>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {investidor.nacionalidade}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="font-mono text-sm">{investidor.passaporte_numero}</span>
-                  </td>
-                  <td className="font-semibold">
-                    {formatCurrency(investidor.valor_investimento)}
-                  </td>
-                  <td>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusOptions.find(s => s.value === investidor.status)?.color || 'bg-gray-100 text-gray-800'
-                      }`}>
-                      <StatusIcon className="w-3 h-3 mr-1" />
-                      {statusOptions.find(s => s.value === investidor.status)?.label || investidor.status}
-                    </span>
-                  </td>
-                  <td>
+                <div key={inv.id} className="border rounded-lg p-3 bg-white shadow-sm">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                          {inv.codigo_identificacao || 'N/A'}
+                        </span>
+                        {inv.codigo_identificacao && (
+                          <button
+                            onClick={() => copyToClipboard(inv.codigo_identificacao, inv.id)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="font-medium text-gray-900 mt-1">{inv.nome_completo}</div>
+                      <div className="text-sm text-gray-500">{inv.nacionalidade}</div>
+                      <div className="text-sm font-mono text-gray-700 mt-1">{inv.passaporte_numero}</div>
+                      {inv.passaporte_validade && (
+                        <div className="text-xs text-gray-500">Validade: {formatDate(inv.passaporte_validade)}</div>
+                      )}
+                      <div className="flex items-center mt-2 space-x-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
+                        }`}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {statusOptions.find(s => s.value === inv.status)?.label || inv.status}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
+                        }`}>
+                          {inv.tipo === 'INVESTIMENTO' ? 'Investimento' : 'Doação'}
+                        </span>
+                      </div>
+                    </div>
                     <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleViewDetalhes(investidor)}
-                        className="text-green-600 hover:text-green-900"
-                        title="Ver todas as informações"
-                      >
+                      <button onClick={() => handleViewDetalhes(inv)} className="text-green-600 hover:text-green-900">
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => handleDocumentos(investidor)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Ver documentos"
-                        disabled={!canViewDocuments(investidor.status)}
-                      >
+                      <button onClick={() => handleDocumentos(inv)} className="text-blue-600 hover:text-blue-900">
                         <FileText className="w-4 h-4" />
                       </button>
-
-                      {/*canSendToInstitution(investidor.status) && (
-                        <button
-                          onClick={() => handleEnviarParaInstituicao(investidor.id)}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Enviar para instituições"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                      )*/}
-
-                      {canSendToInstitution(investidor.status) && (
-                        <button
-                          onClick={() => {
-                            setInvestidorSelecionado(investidor); // guarda o investidor
-                            setShowEnviarModal(true); // abre a modal
-                          }}
-                          className="text-purple-600 hover:text-purple-900"
-                          title="Enviar para instituições"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => handleDelete(investidor.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Eliminar"
-                      >
+                      <button onClick={() => handleEdit(inv)} className="text-blue-600 hover:text-blue-900">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(inv.id)} className="text-red-600 hover:text-red-900">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-
-        {filteredInvestidores.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum investidor encontrado</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm || filterStatus ? 'Tente alterar os filtros de pesquisa.' : 'Não existem investidores registados.'}
-            </p>
           </div>
-        )}
-      </div>
 
-   <Modal
-  isOpen={showEnviarModal}
-  onClose={() => setShowEnviarModal(false)}
-  title="Confirmar Envio"
->
-  <p className="mb-4">
-    Deseja realmente enviar os dados do investidor{" "}
-    <strong>{investidorSelecionado?.nome_completo}</strong> para as seguintes
-    instituições?
-  </p>
+          {/* Desktop View */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-full table-auto">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Código</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Nome Completo</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Nacionalidade</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Passaporte</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Valor (USD)</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredInvestidores.map(inv => {
+                  const StatusIcon = statusOptions.find(s => s.value === inv.status)?.icon || AlertCircle;
+                  return (
+                    <tr key={inv.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex items-center space-x-1">
+                          <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                            {inv.codigo_identificacao || 'N/A'}
+                          </span>
+                          {inv.codigo_identificacao && (
+                            <button
+                              onClick={() => copyToClipboard(inv.codigo_identificacao, inv.id)}
+                              className="text-gray-400 hover:text-gray-600"
+                              title="Copiar código"
+                            >
+                              <Copy className="w-3 h-3" />
+                              {copiedCode === inv.id && (
+                                <span className="absolute mt-6 ml-4 text-xs text-green-600 bg-white px-1 rounded shadow">
+                                  Copiado!
+                                </span>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 font-medium whitespace-nowrap">{inv.nome_completo}</td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Flag className="w-3 h-3 mr-1" />
+                          {inv.nacionalidade}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="font-mono text-sm">{inv.passaporte_numero}</div>
+                        {inv.passaporte_validade && (
+                          <div className="text-xs text-gray-500">Validade: {formatDate(inv.passaporte_validade)}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
+                        }`}>
+                          {inv.tipo === 'INVESTIMENTO' ? 'Investimento' : 'Doação'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 font-semibold whitespace-nowrap">
+                        {formatCurrency(inv.valor_investimento)}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
+                        }`}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {statusOptions.find(s => s.value === inv.status)?.label || inv.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewDetalhes(inv)}
+                            className="text-green-600 hover:text-green-900"
+                            title="Ver detalhes"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDocumentos(inv)}
+                            className={`${canViewDocuments(inv.status) ? 'text-blue-600 hover:text-blue-900' : 'text-gray-300 cursor-not-allowed'}`}
+                            title="Ver documentos"
+                            disabled={!canViewDocuments(inv.status)}
+                          >
+                            <FileText className="w-4 h-4" />
+                          </button>
+                          {canSendToInstitution(inv.status) && (
+                            <button
+                              onClick={() => {
+                                setInvestidorSelecionado(inv);
+                                setShowEnviarModal(true);
+                              }}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Enviar para instituições"
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEdit(inv)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(inv.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
-  {/* Lista de instituições */}
-  <div className="space-y-2 mb-4">
-    {instituicoesDisponiveis.map((instituicao) => (
-      <label
-        key={instituicao}
-        className="flex items-center space-x-2 cursor-pointer"
+      {/* Modal de Envio */}
+      <Modal
+        isOpen={showEnviarModal}
+        onClose={() => {
+          setShowEnviarModal(false);
+          setInstituicoesSelecionadas([]);
+        }}
+        title="Confirmar Envio para Instituições"
       >
-        <input
-          type="checkbox"
-          checked={instituicoesSelecionadas.includes(instituicao)}
-          onChange={() => toggleInstituicao(instituicao)}
-          className="w-4 h-4 text-purple-600"
-        />
-        <span>{instituicao}</span>
-      </label>
-    ))}
-  </div>
+        {investidorSelecionado && (
+          <>
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-gray-600">Investidor:</p>
+              <p className="font-medium">{investidorSelecionado.nome_completo}</p>
+              <p className="text-sm text-gray-600 mt-2">Código:</p>
+              <div className="flex items-center space-x-2">
+                <span className="font-mono font-bold text-blue-700 bg-white px-2 py-1 rounded border">
+                  {investidorSelecionado.codigo_identificacao}
+                </span>
+                <button
+                  onClick={() => copyToClipboard(investidorSelecionado.codigo_identificacao, 'modal')}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
 
-  <div className="flex justify-end mt-4 space-x-3">
-    <button
-      className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-      onClick={() => setShowEnviarModal(false)}
-    >
-      Cancelar
-    </button>
+            <p className="mb-4">
+              Selecione as instituições para enviar o processo:
+            </p>
 
-    <button
-      className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-      disabled={instituicoesSelecionadas.length === 0}
-      onClick={() => {
-        handleEnviarParaInstituicao(
-          investidorSelecionado.id,
-          instituicoesSelecionadas
-        );
-        setInstituicoesSelecionadas([]);
-        setShowEnviarModal(false);
-      }}
-    >
-      Confirmar Envio
-    </button>
-  </div>
-</Modal>
+            <div className="space-y-2 mb-4">
+              {instituicoesDisponiveis.map((inst) => (
+                <label
+                  key={inst.id}
+                  className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-50 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    checked={instituicoesSelecionadas.includes(inst)}
+                    onChange={() => toggleInstituicao(inst)}
+                    className="w-4 h-4 text-purple-600"
+                  />
+                  <span>{inst.nome}</span>
+                </label>
+              ))}
+            </div>
 
+            <div className="flex justify-end space-x-3">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowEnviarModal(false);
+                  setInstituicoesSelecionadas([]);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="primary"
+                disabled={instituicoesSelecionadas.length === 0}
+                onClick={() => {
+                  handleEnviarParaInstituicao(investidorSelecionado.id, instituicoesSelecionadas);
+                  setInstituicoesSelecionadas([]);
+                  setShowEnviarModal(false);
+                }}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Confirmar Envio
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
 
-      {/* Modal de Detalhes - Visualizar todas as informações */}
+      {/* Modal de Detalhes */}
       <Modal
         isOpen={showDetalhesModal}
         onClose={() => setShowDetalhesModal(false)}
@@ -543,6 +669,44 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
       >
         {selectedInvestidor && (
           <div className="space-y-6">
+            {/* Código em destaque */}
+            {selectedInvestidor.codigo_identificacao && (
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm text-blue-700">Código de identificação:</span>
+                    <span className="ml-2 font-mono font-bold text-blue-800">{selectedInvestidor.codigo_identificacao}</span>
+                  </div>
+                  <button
+                    onClick={() => copyToClipboard(selectedInvestidor.codigo_identificacao, 'detalhes')}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline do processo */}
+            {selectedInvestidor.workflow?.timeline?.length > 0 && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium mb-3">Linha do Tempo</h4>
+                <div className="space-y-2">
+                  {selectedInvestidor.workflow.timeline.slice(-5).map((evento, idx) => (
+                    <div key={idx} className="flex items-start space-x-2 text-sm">
+                      <Clock className="w-4 h-4 text-gray-400 mt-0.5" />
+                      <div>
+                        <p className="text-gray-600">{evento.evento}</p>
+                        <p className="text-xs text-gray-400">
+                          {format(parseISO(evento.data), "dd/MM/yyyy 'às' HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Informações Pessoais */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-3">Informações Pessoais</h3>
@@ -632,8 +796,9 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${statusOptions.find(s => s.value === selectedInvestidor.status)?.color || 'bg-gray-100 text-gray-800'
-                    }`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                    statusOptions.find(s => s.value === selectedInvestidor.status)?.color || 'bg-gray-100 text-gray-800'
+                  }`}>
                     {statusOptions.find(s => s.value === selectedInvestidor.status)?.label || selectedInvestidor.status}
                   </span>
                 </div>
@@ -656,50 +821,19 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
               </div>
             )}
 
-            {/* Botão de ação */}
-            <div className="flex justify-between items-center pt-4 border-t">
-              <div className="text-sm text-gray-500">
-                {selectedInvestidor.status === 'ENVIADO' ? (
-                  <span className="text-green-600 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-1" />
-                    Este investidor já foi enviado para as instituições
-                  </span>
-                ) : canSendToInstitution(selectedInvestidor.status) ? (
-                  <span className="text-blue-600">
-                    Pronto para enviar para as instituições
-                  </span>
-                ) : (
-                  <span className="text-gray-500">
-                    Status atual: {statusOptions.find(s => s.value === selectedInvestidor.status)?.label}
-                  </span>
-                )}
-              </div>
-              <div className="flex space-x-3">
-                {canSendToInstitution(selectedInvestidor.status) && (
-                  <Button
-                    onClick={() => {
-                      setShowDetalhesModal(false);
-                      handleEnviarParaInstituicao(selectedInvestidor.id);
-                    }}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Enviar para Instituições
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setShowDetalhesModal(false)}
-                >
-                  Fechar
-                </Button>
-              </div>
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button
+                variant="secondary"
+                onClick={() => setShowDetalhesModal(false)}
+              >
+                Fechar
+              </Button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Modal de Documentos - Apenas visualização para instituições */}
+      {/* Modal de Documentos */}
       <Modal
         isOpen={showDocumentosModal}
         onClose={() => setShowDocumentosModal(false)}
@@ -708,11 +842,27 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
       >
         {selectedInvestidor && (
           <div className="space-y-4">
-            {/* Informação do status */}
+            {/* Código do investidor */}
+            {selectedInvestidor.codigo_identificacao && (
+              <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <span className="text-sm text-gray-600">Código:</span>
+                <div className="flex items-center space-x-2">
+                  <span className="font-mono font-bold">{selectedInvestidor.codigo_identificacao}</span>
+                  <button
+                    onClick={() => copyToClipboard(selectedInvestidor.codigo_identificacao, 'documentos')}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Status dos documentos */}
             <div className={`p-3 rounded-lg ${selectedInvestidor.status === 'ENVIADO'
               ? 'bg-green-50 border border-green-200'
               : 'bg-yellow-50 border border-yellow-200'
-              }`}>
+            }`}>
               <div className="flex items-center">
                 {selectedInvestidor.status === 'ENVIADO' ? (
                   <>
@@ -732,10 +882,10 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
               </div>
             </div>
 
-            {/* Upload de documentos (apenas se não enviado) */}
+            {/* Upload de documentos */}
             {selectedInvestidor.status !== 'ENVIADO' && (
               <div className="border rounded-lg p-4">
-                <h3 className="text-lg font-medium text-gray-900 mb-3">Enviar Documento Adicional</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Enviar Documento</h3>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Selecionar arquivo
@@ -803,7 +953,6 @@ const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
 
             <div className="flex justify-end pt-4 border-t">
               <Button
-                type="button"
                 variant="secondary"
                 onClick={() => setShowDocumentosModal(false)}
               >
