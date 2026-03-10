@@ -1,12 +1,12 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { FileText, CheckCircle, RefreshCw,Copy } from 'lucide-react';
+import { FileText, CheckCircle, RefreshCw, Copy } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { format, parseISO, subYears, differenceInYears } from 'date-fns';
 //import { ptBR } from 'date-fns/locale';
 import { PhoneInput } from '../components/ui/PhoneInput';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { generateInvestmentCode} from '../utils/generateInvestmentCode';
+import { generateInvestmentCode } from '../utils/generateInvestmentCode';
 
 const validateAge = (dateString) => {
     if (!dateString) return true;
@@ -153,13 +153,13 @@ export default function FormularioInvestimento() {
             }
 
             // Navegar com mensagem de sucesso
-            navigate('/investidores', { 
-                state: { 
+            navigate('/ver-investidores', {
+                state: {
                     message: editingId ? 'Investidor atualizado com sucesso!' : 'Investidor criado com sucesso!',
-                    codigo: dadosCompletos.codigo_identificacao 
+                    codigo: dadosCompletos.codigo_identificacao
                 }
             });
-            
+
         } catch (error) {
             console.error('Erro ao salvar:', error);
             alert('Erro ao salvar os dados. Tente novamente.');
@@ -177,7 +177,7 @@ export default function FormularioInvestimento() {
                         </div>
                         <div className="ml-3">
                             <p className="text-sm text-green-700">
-                                Investidor criado com sucesso! 
+                                Investidor criado com sucesso!
                                 <br />
                                 <strong>Código de identificação: {codigoGerado}</strong>
                                 <br />
@@ -216,9 +216,9 @@ export default function FormularioInvestimento() {
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     {/* Campo hidden para o código (quando editando) */}
                     {!editingId && (
-                        <input 
-                            type="hidden" 
-                            {...register('codigo_identificacao')} 
+                        <input
+                            type="hidden"
+                            {...register('codigo_identificacao')}
                             value={codigoGerado}
                         />
                     )}
@@ -366,7 +366,7 @@ export default function FormularioInvestimento() {
                         </div>
                     </div>
 
-                    {/* Investimento */}
+                    {/*   {/* Investimento 
                     <div className="border-t pt-4">
                         <h3 className="text-lg font-medium text-gray-900 mb-3">Informações de Investimento</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -413,23 +413,18 @@ export default function FormularioInvestimento() {
                                 </p>
                             </div>
                         </div>
-
-                        <div className="mt-4">
-                            <label className="block text-sm font-medium text-gray-700">
-                                Status *
-                            </label>
-                            <select
-                                {...register('status', { required: 'Status é obrigatório' })}
-                                className="input mt-1"
-                            >
-                                {statusOptions.map(option => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+*/}
+                    <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700">
+                            Status *
+                        </label>
+                        <input
+                            type="hidden"
+                            value="Pendente"
+                        />
+                        <p className="mt-1 text-gray-900">Pendente</p>
                     </div>
+
 
                     {/* Observações */}
                     <div className="border-t pt-4">

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { 
-  Plus, Search, Edit, Trash2, FileText, Eye, Send, 
-  CheckCircle, XCircle, Clock, AlertCircle, Download, 
-  Users, Flag, Copy 
+import {
+  Plus, Search, Edit, Trash2, FileText, Eye, Send,
+  CheckCircle, XCircle, Clock, AlertCircle, Download,
+  Users, Flag, Copy, Shield
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -10,6 +10,10 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { useInvestidores } from "../hooks/useInvestidores";
+import { ConfirmModal } from "../components/modals/ConfirmModal";
+import { SuccessModal } from "../components/modals/SuccessModal";
+
 
 // Dados Mock
 const MOCK_INVESTIDORES = [
@@ -107,25 +111,29 @@ const instituicoesDisponiveis = [
 
 export const Investidores = () => {
   const navigate = useNavigate();
-  
+
   // Estados principais
-  const [investidores, setInvestidores] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    investidores, setInvestidores, loading, save } = useInvestidores(MOCK_INVESTIDORES);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  
+
   // Estados para modais
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
   const [showDocumentosModal, setShowDocumentosModal] = useState(false);
   const [showEnviarModal, setShowEnviarModal] = useState(false);
   const [selectedInvestidor, setSelectedInvestidor] = useState(null);
   const [investidorSelecionado, setInvestidorSelecionado] = useState(null);
-  
+
   // Estados para documentos
   const [documentos, setDocumentos] = useState([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [instituicoesSelecionadas, setInstituicoesSelecionadas] = useState([]);
   const [copiedCode, setCopiedCode] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [confirmConfig, setConfirmConfig] = useState(null);
+  //const [confirmEnvioId, setConfirmEnvioId] = useState(null);
 
   const statusOptions = [
     { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -155,39 +163,12 @@ export const Investidores = () => {
     { value: 'DOAÇÃO', label: 'Doação' }
   ];
 
-  // Carregar dados
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = () => {
-    setLoading(true);
-    try {
-      const stored = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-      
-      if (stored.length === 0) {
-        setInvestidores(MOCK_INVESTIDORES);
-        localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(MOCK_INVESTIDORES));
-      } else {
-        setInvestidores(stored);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setInvestidores(MOCK_INVESTIDORES);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadDocumentos = (investidorId) => {
     const docs = MOCK_DOCUMENTOS.filter(d => d.investidor_id === investidorId);
     setDocumentos(docs);
   };
 
-  const save = (next) => {
-    setInvestidores(next);
-    localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(next));
-  };
 
   // Handlers de navegação
   const handleCreate = () => navigate('/formulario-investimento');
@@ -195,8 +176,22 @@ export const Investidores = () => {
 
   // Handlers de ações
   const handleDelete = (id) => {
-    if (!confirm('Tem certeza que deseja eliminar este investidor?')) return;
-    save(investidores.filter(i => i.id !== id));
+
+  setConfirmConfig({
+    title: "Confirmar eliminação",
+    message: "Tem certeza que deseja eliminar este investidor?",
+    onConfirm: () => {
+      save(investidores.filter(i => i.id !== id));
+      setSuccessMessage("Investidor eliminado com sucesso!");
+    }
+  });
+
+};
+
+  const confirmDelete = () => {
+    save(investidores.filter(i => i.id !== confirmDeleteId));
+    setSuccessMessage("Investidor eliminado com sucesso!");
+    setConfirmDeleteId(null);
   };
 
   const handleViewDetalhes = (investidor) => {
@@ -227,19 +222,19 @@ export const Investidores = () => {
         }
       ]);
       setUploadingDoc(false);
-      alert('Documento enviado com sucesso!');
+      setSuccessMessage('Documento enviado com sucesso!');
     }, 800);
   };
 
   const handleDownloadDocumento = (documento) => {
-    alert(`Download do ficheiro: ${documento.nome_arquivo}`);
+    setSuccessMessage(`Download do ficheiro: ${documento.nome_arquivo}`);
   };
 
   const handleEnviarParaInstituicao = (investidorId, instituicoes) => {
-    if (!confirm('Deseja enviar este investidor para as instituições?')) return;
+
 
     const dataEnvio = new Date().toISOString();
-    
+
     const updated = investidores.map(inv => {
       if (inv.id === investidorId) {
         // Criar histórico de envios
@@ -275,7 +270,7 @@ export const Investidores = () => {
     });
 
     save(updated);
-    alert('Investidor enviado com sucesso!');
+    setSuccessMessage('Investidor enviado com sucesso!');
   };
 
   const copyToClipboard = (code, id) => {
@@ -425,15 +420,13 @@ export const Investidores = () => {
                         <div className="text-xs text-gray-500">Validade: {formatDate(inv.passaporte_validade)}</div>
                       )}
                       <div className="flex items-center mt-2 space-x-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
+                          }`}>
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusOptions.find(s => s.value === inv.status)?.label || inv.status}
                         </span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
+                          }`}>
                           {inv.tipo === 'INVESTIMENTO' ? 'Investimento' : 'Doação'}
                         </span>
                       </div>
@@ -513,9 +506,8 @@ export const Investidores = () => {
                         )}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${inv.tipo === 'INVESTIMENTO' ? 'bg-purple-100 text-purple-800' : 'bg-pink-100 text-pink-800'
+                          }`}>
                           {inv.tipo === 'INVESTIMENTO' ? 'Investimento' : 'Doação'}
                         </span>
                       </td>
@@ -523,9 +515,8 @@ export const Investidores = () => {
                         {formatCurrency(inv.valor_investimento)}
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusOptions.find(s => s.value === inv.status)?.color || 'bg-gray-100 text-gray-800'
+                          }`}>
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusOptions.find(s => s.value === inv.status)?.label || inv.status}
                         </span>
@@ -591,7 +582,7 @@ export const Investidores = () => {
           setShowEnviarModal(false);
           setInstituicoesSelecionadas([]);
         }}
-        title="Confirmar Envio para Instituições"
+        title="Confirmar Envio para Ministério Público"
       >
         {investidorSelecionado && (
           <>
@@ -613,24 +604,20 @@ export const Investidores = () => {
             </div>
 
             <p className="mb-4">
-              Selecione as instituições para enviar o processo:
+              Deseja enviar este processo para o <strong>Ministério Público</strong>?
             </p>
 
-            <div className="space-y-2 mb-4">
-              {instituicoesDisponiveis.map((inst) => (
-                <label
-                  key={inst.id}
-                  className="flex items-center space-x-2 cursor-pointer p-2 hover:bg-gray-50 rounded"
-                >
-                  <input
-                    type="checkbox"
-                    checked={instituicoesSelecionadas.includes(inst)}
-                    onChange={() => toggleInstituicao(inst)}
-                    className="w-4 h-4 text-purple-600"
-                  />
-                  <span>{inst.nome}</span>
-                </label>
-              ))}
+            <div className="bg-purple-50 p-4 rounded-lg mb-4">
+              <div className="flex items-center">
+                <Shield className="w-5 h-5 text-purple-600 mr-2" />
+                <div>
+                  <p className="font-medium text-purple-900">Ministério Público</p>
+                  <p className="text-sm text-purple-700">
+                    O processo será encaminhado para análise inicial do Ministério Público.
+                    Após aprovação, seguirá o fluxo normal para as demais instituições.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-3">
@@ -645,15 +632,15 @@ export const Investidores = () => {
               </Button>
               <Button
                 variant="primary"
-                disabled={instituicoesSelecionadas.length === 0}
                 onClick={() => {
-                  handleEnviarParaInstituicao(investidorSelecionado.id, instituicoesSelecionadas);
+
+                  handleEnviarParaInstituicao(investidorSelecionado.id, [{ id: 'mp', nome: 'Ministério Público' }]);
                   setInstituicoesSelecionadas([]);
                   setShowEnviarModal(false);
                 }}
               >
                 <Send className="w-4 h-4 mr-2" />
-                Confirmar Envio
+                Confirmar Envio para Ministério Público
               </Button>
             </div>
           </>
@@ -796,9 +783,8 @@ export const Investidores = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${
-                    statusOptions.find(s => s.value === selectedInvestidor.status)?.color || 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${statusOptions.find(s => s.value === selectedInvestidor.status)?.color || 'bg-gray-100 text-gray-800'
+                    }`}>
                     {statusOptions.find(s => s.value === selectedInvestidor.status)?.label || selectedInvestidor.status}
                   </span>
                 </div>
@@ -862,7 +848,7 @@ export const Investidores = () => {
             <div className={`p-3 rounded-lg ${selectedInvestidor.status === 'ENVIADO'
               ? 'bg-green-50 border border-green-200'
               : 'bg-yellow-50 border border-yellow-200'
-            }`}>
+              }`}>
               <div className="flex items-center">
                 {selectedInvestidor.status === 'ENVIADO' ? (
                   <>
@@ -962,6 +948,18 @@ export const Investidores = () => {
           </div>
         )}
       </Modal>
+      <ConfirmModal
+        isOpen={!!confirmConfig}
+        title={confirmConfig?.title}
+        message={confirmConfig?.message}
+        onConfirm={confirmConfig?.onConfirm}
+        onCancel={() => setConfirmConfig(null)}
+      />
+
+      <SuccessModal
+        message={successMessage}
+        onClose={() => setSuccessMessage(null)}
+      />
     </div>
   );
 };

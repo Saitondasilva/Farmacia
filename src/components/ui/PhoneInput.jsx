@@ -39,20 +39,36 @@ export const PhoneInput = ({ value, onChange, ...props }) => {
     
     setDisplayValue(formatted);
     
-    // Envia o valor limpo (sem formatação) para o onChange
+    // CORREÇÃO: Criar um evento sintético para o react-hook-form
     const cleanValue = formatted.replace(/\s/g, '');
-    onChange(cleanValue);
+    
+    // Criar um objeto de evento falso
+    const fakeEvent = {
+      target: {
+        name: props.name,  // Importante para o react-hook-form
+        value: cleanValue
+      }
+    };
+    
+    onChange(fakeEvent);  // Passa o evento em vez da string
   };
 
   const handleBlur = () => {
     // Garante que o número está completo e bem formatado
     if (displayValue && !displayValue.startsWith('+239')) {
-      // Se não tem código do país, adiciona
       const numbers = displayValue.replace(/\s/g, '');
       if (numbers.length === 7 && numbers.startsWith('9')) {
         const formatted = `+239 ${numbers.substring(0, 3)} ${numbers.substring(3, 5)} ${numbers.substring(5)}`;
         setDisplayValue(formatted);
-        onChange(`+239${numbers}`);
+        
+        // CORREÇÃO: Também no blur
+        const fakeEvent = {
+          target: {
+            name: props.name,
+            value: `+239${numbers}`
+          }
+        };
+        onChange(fakeEvent);
       }
     }
   };

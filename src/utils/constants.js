@@ -3,7 +3,7 @@ export const INSTITUICOES = {
   // Órgãos de análise
   MP: { id: 'mp', nome: 'Ministério Público', ordem: 1, tipo: 'analise' },
   MJ: { id: 'mj', nome: 'Ministério da Justiça', ordem: 2, tipo: 'encaminhamento' },
-  CJ: { id: 'cj', nome: 'Conselho da Justiça', ordem: 3, tipo: 'analise_relatorio' },
+  CM: { id: 'cm', nome: 'Conselho de Ministros', ordem: 3, tipo: 'analise_relatorio' },
   PR: { id: 'pr', nome: 'Presidência da República', ordem: 4, tipo: 'promulgacao' },
   
   // Órgãos internos
@@ -28,7 +28,7 @@ export const STATUS_FLUXO = {
 };
 
 export const TIPOS_DOCUMENTO = {
-  RELATORIO_CJ: 'relatorio_cj',
+  RELATORIO_CM: 'relatorio_cm',
   RELATORIO_PROMULGACAO: 'relatorio_promulgacao',
   CERTIDAO_REGISTRO_CIVIL: 'certidao_registro_civil',
   CERTIDAO_REGISTRO_CRIMINAL: 'certidao_registro_criminal',

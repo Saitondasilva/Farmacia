@@ -1,9 +1,9 @@
 // pages/MinisterioPublico.jsx
 import { useState, useEffect } from 'react';
-import { 
-  Search, FileText, Eye, CheckCircle, XCircle, 
+import {
+  Search, FileText, Eye, CheckCircle, XCircle,
   Clock, AlertCircle, Download, Copy, ArrowRight,
-  Bell, UserCheck, UserX, Calendar
+  Bell, Upload, File, FileUp, Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -11,6 +11,7 @@ import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
+import { SuccessModal } from '../components/modals/SuccessModal';
 
 const INSTITUICOES = {
   mp: { id: 'mp', nome: 'Ministério Público', ordem: 1, cor: 'purple' },
@@ -23,13 +24,13 @@ const INSTITUICOES = {
 
 export const MinisterioPublico = () => {
   const navigate = useNavigate();
-  
+
   // Estados principais
   const [processos, setProcessos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  
+
   // Estados para modais
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
   const [showDocumentosModal, setShowDocumentosModal] = useState(false);
@@ -37,9 +38,17 @@ export const MinisterioPublico = () => {
   const [observacoes, setObservacoes] = useState('');
   const [documentos, setDocumentos] = useState([]);
   
+  // Estados para upload
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+
   // Estados para notificações
   const [showNotificacoes, setShowNotificacoes] = useState(false);
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(new Date());
+  const [successMessage, setSuccessMessage] = useState(null);
+
+  // Calcular processos não lidos
+  const processosNaoLidos = processos.filter(p => !p.lido).length;
 
   const statusOptions = [
     { value: 'AGUARDANDO', label: 'Aguardando Análise', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
@@ -50,10 +59,17 @@ export const MinisterioPublico = () => {
     { value: 'REPASSADO', label: 'Repassado', color: 'bg-purple-100 text-purple-800', icon: ArrowRight }
   ];
 
+  // Função para calcular dias restantes
+  const calcularDiasRestantes = (dataExpiracao) => {
+    if (!dataExpiracao) return 0;
+    const dias = differenceInDays(parseISO(dataExpiracao), new Date());
+    return dias;
+  };
+
   // Carregar processos destinados ao MP
   useEffect(() => {
     carregarProcessos();
-    
+
     // Verificar expiração a cada hora
     const interval = setInterval(verificarExpiracao, 3600000);
     return () => clearInterval(interval);
@@ -63,39 +79,48 @@ export const MinisterioPublico = () => {
     setLoading(true);
     try {
       const investidores = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-      
+
       // Filtrar processos que estão com o MP
       const processosMP = [];
-      
+
       investidores.forEach(inv => {
         if (inv.workflow?.historico) {
           // Encontrar o item do histórico que corresponde ao MP
           const itemMP = inv.workflow.historico.find(
             h => h.instituicao === 'mp' && h.status === 'AGUARDANDO'
           );
-          
+
           if (itemMP) {
             processosMP.push({
               id: inv.id,
               codigo: inv.codigo_identificacao,
               nome: inv.nome_completo,
+              data_nascimento: inv.data_nascimento,
               nacionalidade: inv.nacionalidade,
+              sexo: inv.sexo,
+              estado_civil: inv.estado_civil,
               passaporte: inv.passaporte_numero,
-              valor: inv.valor_investimento,
+              passaporte_validade: inv.passaporte_validade,
+              bi_numero: inv.bi_numero,
+              email: inv.email,
+              telefone: inv.telefone,
+              endereco: inv.endereco,
               tipo: inv.tipo,
+              valor: inv.valor_investimento,
+              status: itemMP.status,
+              lido: itemMP.lido || false,
+              observacoes: itemMP.observacoes,
               data_recebimento: itemMP.data_recebimento,
               data_expiracao: new Date(new Date(itemMP.data_recebimento).setDate(
                 new Date(itemMP.data_recebimento).getDate() + 30
               )).toISOString(),
-              status: itemMP.status,
-              lido: itemMP.lido || false,
-              observacoes: itemMP.observacoes,
+              documentos: inv.documentos || [],
               investidor: inv
             });
           }
         }
       });
-      
+
       // Ordenar por data (mais recentes primeiro)
       processosMP.sort((a, b) => new Date(b.data_recebimento) - new Date(a.data_recebimento));
       setProcessos(processosMP);
@@ -109,18 +134,18 @@ export const MinisterioPublico = () => {
   const verificarExpiracao = () => {
     const investidores = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
     let modificado = false;
-    
+
     investidores.forEach(inv => {
       if (inv.workflow?.historico) {
         inv.workflow.historico.forEach(item => {
           if (item.instituicao === 'mp' && item.status === 'AGUARDANDO') {
             const dataExpiracao = new Date(item.data_recebimento);
             dataExpiracao.setDate(dataExpiracao.getDate() + 30);
-            
+
             if (new Date() > dataExpiracao) {
               item.status = 'EXPIRADO';
               modificado = true;
-              
+
               // Adicionar à timeline
               inv.workflow.timeline.push({
                 data: new Date().toISOString(),
@@ -132,7 +157,7 @@ export const MinisterioPublico = () => {
         });
       }
     });
-    
+
     if (modificado) {
       localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(investidores));
       carregarProcessos();
@@ -141,7 +166,7 @@ export const MinisterioPublico = () => {
 
   const marcarComoLido = (processoId) => {
     const investidores = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-    
+
     investidores.forEach(inv => {
       if (inv.id === processoId && inv.workflow?.historico) {
         inv.workflow.historico.forEach(item => {
@@ -151,7 +176,7 @@ export const MinisterioPublico = () => {
         });
       }
     });
-    
+
     localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(investidores));
     carregarProcessos();
   };
@@ -159,6 +184,7 @@ export const MinisterioPublico = () => {
   const handleAnalisar = (processo) => {
     setSelectedProcesso(processo);
     setObservacoes(processo.observacoes || '');
+    setUploadedFiles([]); // Resetar arquivos carregados
     setShowAnaliseModal(true);
     marcarComoLido(processo.id);
     setUltimaAtualizacao(new Date());
@@ -166,48 +192,99 @@ export const MinisterioPublico = () => {
 
   const handleVerDocumentos = (processo) => {
     setSelectedProcesso(processo);
-    // Carregar documentos mock
-    setDocumentos([
-      {
-        id: 1,
-        nome: 'Passaporte.pdf',
-        tipo: 'PDF',
-        data: processo.data_recebimento
-      },
-      {
-        id: 2,
-        nome: 'Comprovativo_Residencia.pdf',
-        tipo: 'PDF',
-        data: processo.data_recebimento
-      }
-    ]);
+    // Carregar documentos do processo
+    setDocumentos(processo.documentos || []);
     setShowDocumentosModal(true);
+  };
+
+  // Função para lidar com upload de arquivos
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    const newFiles = files.map(file => ({
+      id: Date.now() + Math.random(),
+      nome: file.name,
+      tamanho: file.size,
+      tipo: file.type,
+      data: new Date().toISOString(),
+      file: file,
+      instituicao: 'mp',
+      status: 'pending'
+    }));
+
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
+  };
+
+  // Função para remover arquivo
+  const handleRemoveFile = (fileId) => {
+    setUploadedFiles(uploadedFiles.filter(f => f.id !== fileId));
+  };
+
+  // Função para simular upload (depois substituir por chamada real)
+  const handleConfirmUpload = () => {
+    if (uploadedFiles.length === 0) return;
+
+    setUploading(true);
+
+    setTimeout(() => {
+      // Salvar documentos no localStorage
+      const investidores = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
+      
+      investidores.forEach(inv => {
+        if (inv.id === selectedProcesso.id) {
+          if (!inv.documentos) inv.documentos = [];
+          
+          uploadedFiles.forEach(file => {
+            const novoDoc = {
+              id: file.id,
+              nome: file.nome,
+              tamanho: file.tamanho,
+              tipo: file.tipo,
+              data: file.data,
+              instituicao: 'mp',
+              url: URL.createObjectURL(file.file) // mock URL
+            };
+            inv.documentos.push(novoDoc);
+          });
+        }
+      });
+
+      localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(investidores));
+      
+      setUploading(false);
+      setUploadedFiles([]);
+      
+      // Atualizar documentos no modal se estiver aberto
+      if (selectedProcesso) {
+        const updatedProcesso = { ...selectedProcesso };
+        const investidorAtualizado = investidores.find(i => i.id === selectedProcesso.id);
+        updatedProcesso.documentos = investidorAtualizado?.documentos || [];
+        setSelectedProcesso(updatedProcesso);
+      }
+
+      alert('Documentos enviados com sucesso!');
+    }, 2000);
   };
 
   const handleDecisao = (aprovado) => {
     if (!selectedProcesso) return;
-    
+
     const investidores = JSON.parse(localStorage.getItem('MOCK_INVESTIDORES') || '[]');
-    
+
     investidores.forEach(inv => {
       if (inv.id === selectedProcesso.id && inv.workflow?.historico) {
-        // Encontrar e atualizar o item do MP
         const itemMP = inv.workflow.historico.find(
           h => h.instituicao === 'mp' && h.status === 'AGUARDANDO'
         );
-        
+
         if (itemMP) {
           itemMP.status = aprovado ? 'APROVADO' : 'RECUSADO';
           itemMP.data_analise = new Date().toISOString();
           itemMP.observacoes = observacoes;
-          
+
           if (aprovado) {
-            // Encaminhar para próxima instituição (MJ)
-            const proximaInst = INSTITUICOES.mj;
-            
+            // Encaminhar para MJ
             itemMP.encaminhado_para = 'mj';
-            
-            // Criar novo item para o MJ
             inv.workflow.historico.push({
               instituicao: 'mj',
               data_recebimento: new Date().toISOString(),
@@ -217,23 +294,18 @@ export const MinisterioPublico = () => {
               encaminhado_para: null,
               lido: false
             });
-            
             inv.workflow.instituicao_atual = 'mj';
-            
-            // Adicionar à timeline
             inv.workflow.timeline.push({
               data: new Date().toISOString(),
               evento: 'MP aprovou e encaminhou para Ministério da Justiça',
               instituicao: 'mp'
             });
-            
             inv.workflow.timeline.push({
               data: new Date().toISOString(),
               evento: 'Processo recebido pelo Ministério da Justiça',
               instituicao: 'mj'
             });
           } else {
-            // Processo recusado
             inv.workflow.status_global = 'recusado';
             inv.workflow.timeline.push({
               data: new Date().toISOString(),
@@ -244,22 +316,44 @@ export const MinisterioPublico = () => {
         }
       }
     });
-    
+
     localStorage.setItem('MOCK_INVESTIDORES', JSON.stringify(investidores));
-    
+
     setShowAnaliseModal(false);
     setSelectedProcesso(null);
     carregarProcessos();
-    
-    alert(aprovado ? 'Processo aprovado e encaminhado para o MJ!' : 'Processo recusado!');
+
+    setSuccessMessage(
+      aprovado
+        ? 'Processo aprovado e encaminhado para o Ministério da Justiça!'
+        : 'Processo recusado!'
+    );
   };
 
-  const calcularDiasRestantes = (dataExpiracao) => {
-    const dias = differenceInDays(parseISO(dataExpiracao), new Date());
-    return dias;
+  // Funções auxiliares para formatação
+  const formatSexo = (sexo) => {
+    const map = { M: 'Masculino', F: 'Feminino', O: 'Outro' };
+    return map[sexo] || sexo;
   };
 
-  const processosNaoLidos = processos.filter(p => !p.lido).length;
+  const formatEstadoCivil = (estado) => {
+    const map = {
+      SOLTEIRO: 'Solteiro(a)',
+      CASADO: 'Casado(a)',
+      DIVORCIADO: 'Divorciado(a)',
+      VIUVO: 'Viúvo(a)',
+      'UNIÃO ESTÁVEL': 'União Estável'
+    };
+    return map[estado] || estado;
+  };
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   if (loading) {
     return (
@@ -277,13 +371,13 @@ export const MinisterioPublico = () => {
           <h1 className="text-2xl font-bold text-gray-900">Ministério Público</h1>
           <p className="text-gray-600">Análise de processos de investimento</p>
         </div>
-        
+
         <div className="flex items-center space-x-4">
           {/* Relógio de atualização */}
           <div className="text-sm text-gray-500">
             Atualizado: {format(ultimaAtualizacao, 'HH:mm')}
           </div>
-          
+
           {/* Notificações */}
           <div className="relative">
             <button
@@ -297,7 +391,7 @@ export const MinisterioPublico = () => {
                 </span>
               )}
             </button>
-            
+
             {/* Dropdown de notificações */}
             {showNotificacoes && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border z-50">
@@ -382,7 +476,7 @@ export const MinisterioPublico = () => {
           {processos
             .filter(p => {
               const termo = searchTerm.toLowerCase();
-              return !termo || 
+              return !termo ||
                 p.nome.toLowerCase().includes(termo) ||
                 p.codigo.toLowerCase().includes(termo) ||
                 p.passaporte.toLowerCase().includes(termo);
@@ -390,13 +484,12 @@ export const MinisterioPublico = () => {
             .map(processo => {
               const diasRestantes = calcularDiasRestantes(processo.data_expiracao);
               const StatusIcon = statusOptions.find(s => s.value === processo.status)?.icon || Clock;
-              
+
               return (
                 <div
                   key={processo.id}
-                  className={`border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${
-                    !processo.lido ? 'border-l-4 border-l-blue-500' : ''
-                  }`}
+                  className={`border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow ${!processo.lido ? 'border-l-4 border-l-blue-500' : ''
+                    }`}
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
                     <div className="flex-1">
@@ -410,11 +503,11 @@ export const MinisterioPublico = () => {
                           </span>
                         )}
                       </div>
-                      
+
                       <h3 className="text-lg font-medium text-gray-900 mt-2">
                         {processo.nome}
                       </h3>
-                      
+
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-3">
                         <div>
                           <p className="text-xs text-gray-500">Nacionalidade</p>
@@ -435,25 +528,23 @@ export const MinisterioPublico = () => {
                           <p className="text-sm">{processo.tipo}</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-4 mt-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          statusOptions.find(s => s.value === processo.status)?.color
-                        }`}>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusOptions.find(s => s.value === processo.status)?.color
+                          }`}>
                           <StatusIcon className="w-3 h-3 mr-1" />
                           {statusOptions.find(s => s.value === processo.status)?.label}
                         </span>
-                        
+
                         {processo.status === 'AGUARDANDO' && (
-                          <span className={`text-xs ${
-                            diasRestantes <= 5 ? 'text-red-600' : 'text-gray-500'
-                          }`}>
+                          <span className={`text-xs ${diasRestantes <= 5 ? 'text-red-600' : 'text-gray-500'
+                            }`}>
                             {diasRestantes <= 0 ? 'Expirado' : `${diasRestantes} dias restantes`}
                           </span>
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex space-x-2 mt-4 sm:mt-0">
                       <button
                         onClick={() => handleVerDocumentos(processo)}
@@ -480,63 +571,197 @@ export const MinisterioPublico = () => {
       {/* Modal de Análise */}
       <Modal
         isOpen={showAnaliseModal}
-        onClose={() => setShowAnaliseModal(false)}
+        onClose={() => {
+          setShowAnaliseModal(false);
+          setUploadedFiles([]);
+        }}
         title="Analisar Processo"
         size="lg"
       >
         {selectedProcesso && (
-          <div className="space-y-4">
-            {/* Informações do processo */}
+          <div className="space-y-6">
+            {/* Informações completas do processo */}
             <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium mb-3">Detalhes do Processo</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500">Código</p>
-                  <p className="font-mono">{selectedProcesso.codigo}</p>
+              <h4 className="font-medium mb-3">Informações Completas do Processo</h4>
+              
+              {/* Dados Pessoais */}
+              <div className="mb-4">
+                <h5 className="text-sm font-semibold text-gray-700 mb-2">Dados Pessoais</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Nome Completo</p>
+                    <p className="text-sm font-medium">{selectedProcesso.nome}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Data Nascimento</p>
+                    <p className="text-sm">{format(parseISO(selectedProcesso.data_nascimento), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Nacionalidade</p>
+                    <p className="text-sm">{selectedProcesso.nacionalidade}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Sexo</p>
+                    <p className="text-sm">{formatSexo(selectedProcesso.sexo)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Estado Civil</p>
+                    <p className="text-sm">{formatEstadoCivil(selectedProcesso.estado_civil)}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Nome</p>
-                  <p className="font-medium">{selectedProcesso.nome}</p>
+              </div>
+
+              {/* Documentos de Identificação */}
+              <div className="mb-4">
+                <h5 className="text-sm font-semibold text-gray-700 mb-2">Documentos de Identificação</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Passaporte</p>
+                    <p className="text-sm font-mono">{selectedProcesso.passaporte}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Validade</p>
+                    <p className="text-sm">{format(parseISO(selectedProcesso.passaporte_validade), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">BI</p>
+                    <p className="text-sm font-mono">{selectedProcesso.bi_numero || 'N/A'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Passaporte</p>
-                  <p>{selectedProcesso.passaporte}</p>
+              </div>
+
+              {/* Contacto */}
+              <div className="mb-4">
+                <h5 className="text-sm font-semibold text-gray-700 mb-2">Contacto</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Email</p>
+                    <p className="text-sm">{selectedProcesso.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Telefone</p>
+                    <p className="text-sm">{selectedProcesso.telefone || 'N/A'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-500">Endereço</p>
+                    <p className="text-sm">{selectedProcesso.endereco || 'N/A'}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Nacionalidade</p>
-                  <p>{selectedProcesso.nacionalidade}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Valor</p>
-                  <p className="font-semibold">
-                    ${selectedProcesso.valor?.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Recebido em</p>
-                  <p>{format(parseISO(selectedProcesso.data_recebimento), 'dd/MM/yyyy')}</p>
+              </div>
+
+              {/* Investimento */}
+              <div>
+                <h5 className="text-sm font-semibold text-gray-700 mb-2">Informações do Investimento</h5>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Tipo</p>
+                    <p className="text-sm">{selectedProcesso.tipo}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Valor</p>
+                    <p className="text-sm font-semibold text-green-600">
+                      ${selectedProcesso.valor?.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Recebido em</p>
+                    <p className="text-sm">{format(parseISO(selectedProcesso.data_recebimento), 'dd/MM/yyyy HH:mm')}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Documentos resumidos */}
+            {/* Documentos existentes */}
+            {selectedProcesso.documentos && selectedProcesso.documentos.length > 0 && (
+              <div>
+                <h4 className="font-medium mb-2">Documentos Anexados</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-2">
+                  {selectedProcesso.documentos.map((doc) => (
+                    <div key={doc.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                      <div className="flex items-center">
+                        <FileText className="w-4 h-4 text-blue-500 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium">{doc.nome}</p>
+                          <p className="text-xs text-gray-500">
+                            {format(parseISO(doc.data), 'dd/MM/yyyy HH:mm')} • {formatBytes(doc.tamanho)}
+                          </p>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="secondary" onClick={() => window.open(doc.url, '_blank')}>
+                        <Download className="w-3 h-3 mr-1" />
+                        Ver
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Upload de novos documentos */}
             <div>
-              <h4 className="font-medium mb-2">Documentos</h4>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm">Passaporte.pdf</span>
+              <h4 className="font-medium mb-2">Anexar Novos Documentos</h4>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                <div className="text-center">
+                  <FileUp className="mx-auto h-8 w-8 text-gray-400" />
+                  <div className="mt-2">
+                    <label className="cursor-pointer text-blue-600 hover:text-blue-800">
+                      <span>Clique para selecionar arquivos</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={handleFileUpload}
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                      />
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      PDF, DOC, DOCX, JPG, PNG (máx. 10MB por arquivo)
+                    </p>
                   </div>
-                  <Button size="sm" variant="secondary">Ver</Button>
                 </div>
-                <div className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm">Comprovativo_Residencia.pdf</span>
+
+                {/* Lista de arquivos selecionados */}
+                {uploadedFiles.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {uploadedFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <div className="flex items-center">
+                          <FileText className="w-4 h-4 text-gray-500 mr-2" />
+                          <div>
+                            <p className="text-sm font-medium">{file.nome}</p>
+                            <p className="text-xs text-gray-500">{formatBytes(file.tamanho)}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleRemoveFile(file.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        size="sm"
+                        onClick={handleConfirmUpload}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Enviar Documentos
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                  <Button size="sm" variant="secondary">Ver</Button>
-                </div>
+                )}
               </div>
             </div>
 
@@ -559,7 +784,7 @@ export const MinisterioPublico = () => {
               <div className="flex items-center text-blue-700">
                 <ArrowRight className="w-4 h-4 mr-2" />
                 <span className="text-sm">
-                  Após aprovação, será encaminhado para: <strong>Ministério da Justiça</strong>
+                  Após aprovação, será encaminhado para: <strong>Ministra da Justiça</strong>
                 </span>
               </div>
             </div>
@@ -568,7 +793,10 @@ export const MinisterioPublico = () => {
             <div className="flex justify-end space-x-3 pt-4 border-t">
               <Button
                 variant="secondary"
-                onClick={() => setShowAnaliseModal(false)}
+                onClick={() => {
+                  setShowAnaliseModal(false);
+                  setUploadedFiles([]);
+                }}
               >
                 Cancelar
               </Button>
@@ -611,26 +839,32 @@ export const MinisterioPublico = () => {
             </div>
 
             <div className="space-y-2">
-              {documentos.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center">
-                    <FileText className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{doc.nome}</p>
-                      <p className="text-xs text-gray-500">
-                        {doc.tipo} • {format(parseISO(doc.data), 'dd/MM/yyyy')}
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="secondary">
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </Button>
+              {documentos.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Nenhum documento anexado
                 </div>
-              ))}
+              ) : (
+                documentos.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                  >
+                    <div className="flex items-center">
+                      <FileText className="w-5 h-5 text-gray-400 mr-3" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{doc.nome}</p>
+                        <p className="text-xs text-gray-500">
+                          {format(parseISO(doc.data), 'dd/MM/yyyy HH:mm')} • {doc.instituicao?.toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => window.open(doc.url, '_blank')}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="flex justify-end pt-4 border-t">
@@ -644,6 +878,11 @@ export const MinisterioPublico = () => {
           </div>
         )}
       </Modal>
+
+      <SuccessModal
+        message={successMessage}
+        onClose={() => setSuccessMessage(null)}
+      />
     </div>
   );
 };
