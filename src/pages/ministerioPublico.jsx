@@ -15,7 +15,7 @@ import { SuccessModal } from '../components/modals/SuccessModal';
 
 const INSTITUICOES = {
   mp: { id: 'mp', nome: 'Ministério Público', ordem: 1, cor: 'purple' },
-  mj: { id: 'mj', nome: 'Ministério da Justiça', ordem: 2, cor: 'blue' },
+  mj: { id: 'mj', nome: 'Ministra da Justiça', ordem: 2, cor: 'blue' },
   cm: { id: 'cm', nome: 'Câmara Municipal', ordem: 3, cor: 'green' },
   financas: { id: 'financas', nome: 'Finanças', ordem: 4, cor: 'yellow' },
   sef: { id: 'sef', nome: 'SEF', ordem: 5, cor: 'red' },
@@ -297,12 +297,12 @@ export const MinisterioPublico = () => {
             inv.workflow.instituicao_atual = 'mj';
             inv.workflow.timeline.push({
               data: new Date().toISOString(),
-              evento: 'MP aprovou e encaminhou para Ministério da Justiça',
+              evento: 'MP aprovou e encaminhou para Ministra da Justiça',
               instituicao: 'mp'
             });
             inv.workflow.timeline.push({
               data: new Date().toISOString(),
-              evento: 'Processo recebido pelo Ministério da Justiça',
+              evento: 'Processo recebido pela Ministra da Justiça',
               instituicao: 'mj'
             });
           } else {
@@ -325,7 +325,7 @@ export const MinisterioPublico = () => {
 
     setSuccessMessage(
       aprovado
-        ? 'Processo aprovado e encaminhado para o Ministério da Justiça!'
+        ? 'Processo aprovado e encaminhado para a Ministra da Justiça!'
         : 'Processo recusado!'
     );
   };

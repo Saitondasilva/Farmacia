@@ -143,7 +143,6 @@ export const PresidenciaRepublica = () => {
         carregarProcessos();
     };
 
-    // Na PresidenciaRepublica.jsx - Corrigir handleUploadRelatorio
     const handleUploadRelatorio = (relatorio) => {
         console.log('OBJETO COMPLETO RECEBIDO:', relatorio);
 
