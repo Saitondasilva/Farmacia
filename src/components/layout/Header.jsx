@@ -15,7 +15,7 @@ export const Header = () => {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <h1 className="text-xl font-semibold text-gray-800">
-              UCID-STP - Unidade de Cidadania por Investimentos ou Doação
+              SGF-Sistema de Gestão de Farmacia
             </h1>
           </div>
 

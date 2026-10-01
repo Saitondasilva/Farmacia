@@ -1,6 +1,6 @@
 import api from './api';
 
-export const fornecedoresService = {
+export const fornecedorService = {
   async getAll() {
     const response = await api.get('/fornecedores');
     return response.data;

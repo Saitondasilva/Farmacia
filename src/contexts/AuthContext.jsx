@@ -1,88 +1,163 @@
-// src/contexts/AuthContext.jsx
-import { createContext, useContext, useEffect, useState } from 'react';
-import { useKeycloak } from '@react-keycloak/web';
+// contexts/AuthContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService } from '../services/authService';
 
-const AuthContext = createContext({});
+const AuthContext = createContext();
 
-export const useAuth = () => useContext(AuthContext);
+// CONSTANTES FIXAS - SEM process.env
+const TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
 
 export const AuthProvider = ({ children }) => {
-  const { keycloak, initialized } = useKeycloak();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [token, setToken] = useState(null);
 
   useEffect(() => {
-    if (!initialized) return; // só atualiza depois que o provider estiver pronto
+    const initializeAuth = async () => {
+      try {
+        const savedToken = localStorage.getItem(TOKEN_KEY);
+        const savedUser = localStorage.getItem('auth_user');
 
-    const updateAuthState = () => {
-      const authenticated = keycloak.authenticated || false;
-      setIsAuthenticated(authenticated);
-
-      if (authenticated && keycloak.tokenParsed) {
-        const userInfo = keycloak.tokenParsed;
-        setUser({
-          id: userInfo.sub,
-          name: userInfo.name || userInfo.preferred_username,
-          email: userInfo.email,
-          roles: userInfo.realm_access?.roles || [],
-          isGestor: userInfo.realm_access?.roles?.includes('gestor') || false
+        console.log('🔍 AuthProvider - Inicializando:', { 
+          hasToken: !!savedToken, 
+          hasUser: !!savedUser 
         });
-      } else {
-        setUser(null);
+
+        if (savedToken && savedUser) {
+          setToken(savedToken);
+          setUser(JSON.parse(savedUser));
+          
+          // Validar token com o backend
+          try {
+            const response = await authService.getMe();
+            if (response.success) {
+              setUser(response.data);
+              localStorage.setItem('auth_user', JSON.stringify(response.data));
+            }
+          } catch (error) {
+            console.error('❌ Token inválido:', error);
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
+            localStorage.removeItem('auth_user');
+            setToken(null);
+            setUser(null);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao inicializar autenticação:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    updateAuthState();
+    initializeAuth();
+  }, []);
 
-    keycloak.onAuthSuccess = updateAuthState;
-    keycloak.onAuthError = updateAuthState;
-    keycloak.onAuthRefreshSuccess = updateAuthState;
-    keycloak.onAuthRefreshError = () => keycloak.login();
-    keycloak.onAuthLogout = updateAuthState;
-    keycloak.onTokenExpired = () => {
-      keycloak.updateToken(30).catch(() => keycloak.login());
-    };
-
-    return () => {
-      keycloak.onAuthSuccess = null;
-      keycloak.onAuthError = null;
-      keycloak.onAuthRefreshSuccess = null;
-      keycloak.onAuthRefreshError = null;
-      keycloak.onAuthLogout = null;
-      keycloak.onTokenExpired = null;
-    };
-  }, [keycloak, initialized]);
-
-  const login = () => keycloak?.login();
-  const logout = () => keycloak?.logout();
-  const hasRole = (role) => keycloak?.hasRealmRole(role);
-  const getToken = async () => {
+  const login = async (credentials) => {
+    setLoading(true);
     try {
-      await keycloak.updateToken(30);
-      return keycloak.token;
+      console.log('🔍 Tentando login com:', credentials.email);
+
+      const response = await authService.login(credentials);
+      
+      if (response.success) {
+        // Salva token e usuário
+        localStorage.setItem(TOKEN_KEY, response.token);
+        if (response.refreshToken) {
+          localStorage.setItem(REFRESH_TOKEN_KEY, response.refreshToken);
+        }
+        localStorage.setItem('auth_user', JSON.stringify(response.usuario));
+        
+        setToken(response.token);
+        setUser(response.usuario);
+        
+        console.log('✅ Login bem-sucedido:', response.usuario.nome);
+        
+        return { success: true, user: response.usuario };
+      } else {
+        console.log('❌ Login falhou:', response.error);
+        return { 
+          success: false, 
+          message: response.error || 'Erro ao fazer login' 
+        };
+      }
     } catch (error) {
-      login();
-      return null;
+      console.error('❌ Erro no login:', error);
+      
+      let message = 'Erro ao fazer login. Tente novamente.';
+      
+      if (error.response) {
+        message = error.response.data?.error || message;
+      } else if (error.request) {
+        message = 'Não foi possível conectar ao servidor. Verifique sua conexão.';
+      }
+      
+      return { success: false, message };
+    } finally {
+      setLoading(false);
     }
   };
 
+  const logout = async () => {
+    setLoading(true);
+    try {
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (refreshToken) {
+        await authService.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao fazer logout:', error);
+    } finally {
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem('auth_user');
+      setToken(null);
+      setUser(null);
+      setLoading(false);
+      console.log('🔓 Logout realizado');
+    }
+  };
+
+  const isAuthenticated = () => {
+    return !!user && !!token;
+  };
+
+  const hasRole = (role) => {
+    if (!user) return false;
+    if (user.perfil === role) return true;
+    if (user.permissoes) {
+      return user.permissoes.includes(role);
+    }
+    return false;
+  };
+
+  const getToken = () => {
+    return token || localStorage.getItem(TOKEN_KEY);
+  };
+
+  const value = {
+    user,
+    token,
+    loading,
+    login,
+    logout,
+    isAuthenticated,
+    hasRole,
+    getToken
+  };
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        isAuthenticated,
-        isGestor: user?.isGestor || false,
-        login,
-        logout,
-        hasRole,
-        getToken,
-        keycloak
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
+  }
+  return context;
 };

@@ -1,62 +1,116 @@
-import { ReactKeycloakProvider } from '@react-keycloak/web';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import keycloak from './keycloak/keycloak-config';
-import { useKeycloak } from '@react-keycloak/web';
-import { AuthProvider } from './contexts/AuthContext';
-import Callback from './Callback';
+// App.js
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Layout } from './components/layout/Layout';
 import { Dashboard } from './pages/Dashboard';
-//import { Equipamentos } from './pages/Equipamentos';
-//import { Departamentos } from './pages/Departamentos';
-import { FomularioInvestimento } from './pages/Funcionarios';
-import FormularioInvestimento from './pages/FormularioInvestimento';
-import { Investidores } from './pages/Fornecedores';
-import { MinisterioPublico } from './pages/ministerioPublico';
-import { MinistraJustica } from './pages/ministraJustica';  // <-- AGORA É MinistraJustica
-import { ConselhoMinistro } from './pages/ConselhoMinistros';
-import { PresidenciaRepublica } from './pages/PresidenciaR';
-import { Repografia } from './pages/Repografia';
-//import { Atribuicoes } from './pages/Atribuicoes';
-//import { Categorias } from './pages/Categorias';
-//import { Relatorios } from './pages/Relatorios';
-//import { Marcas } from './pages/Marca';
-//import { Perfil } from './pages/Perfil';
-//import { HistoricoMovimentacoes } from './pages/HistoricoMovimentacoes';
+import { Login } from './pages/Login';
+import { Venda } from './pages/Venda';
+import { HistoricoVenda } from './pages/Historico_vend';
+import { Categorias } from './pages/Categorias';
+import { Produto } from './pages/Produto';
+import { Lotes } from './pages/lotes';
+import { Utilizadores } from './pages/Utilizadores';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
-import { useEffect } from 'react';
 
-// Componente para lidar com redirecionamento após login
-const AuthCallbackHandler = () => {
-  const { keycloak, initialized } = useKeycloak();
-  const navigate = useNavigate();
-  const location = useLocation();
+// Componente principal da aplicação com todas as rotas
+function App() {
+  return (
+    <>
+      <Toaster position="top-right" richColors />
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </>
+  );
+}
 
-  useEffect(() => {
-    if (initialized && keycloak.authenticated) {
-      // Se acabou de voltar do Keycloak com token
-      const params = new URLSearchParams(location.search);
+// Componente de rotas - AGORA DENTRO DO AuthProvider
+function AppRoutes() {
+  return (
+    <Routes>
+      {/* Rota de Login - PÚBLICA */}
+      <Route path="/login" element={<Login />} />
+      
+      {/* Rota do Callback - apenas para compatibilidade */}
+      <Route path="/callback" element={<Navigate to="/login" replace />} />
 
-      // Remove parâmetros da URL do Keycloak
-      if (params.has('state') || params.has('code') || params.has('session_state')) {
-        const redirectPath = localStorage.getItem('keycloak_redirect') || '/dashboard';
-        localStorage.removeItem('keycloak_redirect');
+      {/* Rotas Protegidas */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
+      } />
 
-        // Navega para a página desejada sem os parâmetros
-        navigate(redirectPath, { replace: true });
-      }
-    }
-  }, [initialized, keycloak.authenticated, navigate, location]);
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
+      } />
 
-  return null;
-};
+      <Route path="/utilizador" element={
+        <ProtectedRoute>
+          <Layout>
+            <Utilizadores />
+          </Layout>
+        </ProtectedRoute>
+      } />
+        <Route path="/vendas/nova" element={
+        <ProtectedRoute>
+          <Layout>
+            <Venda />
+          </Layout>
+        </ProtectedRoute>
+      } />
 
-// ProtectedRoute usando useAuth (que agora usa Keycloak internamente)
+      <Route path="/categorias" element={
+        <ProtectedRoute>
+          <Layout>
+            <Categorias />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+       <Route path="/Historico" element={
+        <ProtectedRoute>
+          <Layout>
+            <HistoricoVenda />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/produto" element={
+        <ProtectedRoute>
+          <Layout>
+            <Produto />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/lote/prod" element={
+        <ProtectedRoute>
+          <Layout>
+            <Lotes />
+          </Layout>
+        </ProtectedRoute>
+      } />
+
+      {/* Rota 404 - Redireciona para login */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
+// Componente para proteger rotas - USA o AuthContext (agora dentro do provider)
 const ProtectedRoute = ({ children }) => {
-  const { keycloak, initialized } = useKeycloak();
-  const location = useLocation();
+  const { user, loading } = useAuth();
 
-  if (!initialized) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -64,149 +118,11 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  if (!keycloak.authenticated) {
-    const redirectUri = `${window.location.origin}/callback`;
-
-    // Configura o redirectUri para voltar à página atual
-    const options = {
-      redirectUri: redirectUri,
-      prompt: 'login'
-    };
-
-    // Armazena a página original para redirecionar depois
-    localStorage.setItem('keycloak_original_path', location.pathname);
-
-    keycloak.login(options);
-
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" text="Redirecionando para login..." />
-      </div>
-    );
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  return (
-    <>
-      <AuthCallbackHandler />
-      {children}
-    </>
-  );
+  return children;
 };
-
-function KeycloakProviderWrapper({ children }) {
-  return (
-    <ReactKeycloakProvider
-      authClient={keycloak}
-      initOptions={{
-        onLoad: 'login-required',
-        pkceMethod: 'S256',
-        checkLoginIframe: false,
-        redirectUri: window.location.origin + '/callback',
-        responseMode: 'query'
-      }}
-    >
-      {children}
-    </ReactKeycloakProvider>
-  );
-}
-
-function AppRoutes() {
-
-  return (
-    <Router>
-      <Routes>
-        <Route path="/callback" element={<Callback />} />
-
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/formulario-investimento" element={
-          <ProtectedRoute>
-            <Layout>
-              <FormularioInvestimento />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/investidores" element={
-          <ProtectedRoute>
-            <Layout>
-              <FomularioInvestimento />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/ver-investidores" element={
-          <ProtectedRoute>
-            <Layout>
-              <Investidores />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/ministerio-publico" element={
-          <ProtectedRoute>
-            <Layout>
-              <MinisterioPublico />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/ministra-justica" element={
-          <ProtectedRoute>
-            <Layout>
-              <MinistraJustica />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/conselho-ministro" element={
-          <ProtectedRoute>
-            <Layout>
-              <ConselhoMinistro />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/presidencia" element={
-          <ProtectedRoute>
-            <Layout>
-              <PresidenciaRepublica />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="/repografia" element={
-          <ProtectedRoute>
-            <Layout>
-              <Repografia />
-            </Layout>
-          </ProtectedRoute>
-        } />
-
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
-  );
-}
-
-// Componente principal SEM ReactKeycloakProvider redundante
-function App() {
-  return (
-    <>
-      <Toaster position="top-right" richColors />
-      <KeycloakProviderWrapper>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </KeycloakProviderWrapper>
-    </>
-  );
-}
 
 export default App;
